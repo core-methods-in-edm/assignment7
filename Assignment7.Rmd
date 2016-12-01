@@ -46,6 +46,7 @@ c.tree1 = rpart(level.up~pre.test.score+av.assignment.score+messages, method = "
 printcp(c.tree1)
 plot(c.tree1)
 c.tree2 <- prune(c.tree1, cp = 0.00375)
+plot(c.tree2)
 post(c.tree2, file = "tree2", title = "MOOC") #This creates a pdf image of the tree
  
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
@@ -70,50 +71,49 @@ c.tree1_1 = rpart(level.up~pre.test.score+av.assignment.score+messages+forum.pos
 printcp(c.tree1_1)
 plot(c.tree1_1)
 c.tree2_1 <- prune(c.tree1_1, cp = 0.00375)
-post(c.tree2_1, file = "tree2", title = "MOOC")
+post(c.tree2_1, file = "tree2_1", title = "MOOC")
 pred_1 <- predict(c.tree2_1, type = "prob")[,2]
 pred.detail_1 <- prediction(pred_1, D1$level.up) 
 plot(performance(pred.detail_1, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 unlist(slot(performance(pred.detail_1,"auc"),"y.values"))
 
+#In my opinion, the first model is better than the second one. Because from the auc values, I didnot see a big difference. 
+#The first model achieve this value using less variables.
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
 threshold.pred1 <- 0.1
-for(i in (1:nrow(D1)))
-{
-  if(D1$pred[i]<=threshold.pred1)
-  {
-    D1$threshold.pred1[i] = "no"
-  }
-  else
-  {
-    D1$threshold.pred1[i] = "yes"
-  }
-}
+threshold.pred2 = 0.4
+D1$threshold.pred1 = ifelse(D1$pred<=threshold.pred1, "no","yes")
+D1$threshold.pred2 = ifelse(D1$pred<=threshold.pred2, "no","yes")
+View(D1)
 #Now generate three diagnostics:
-pred_table = table(D1$level.up, D1$threshold.pred1)
-pred_table
-D1$accuracy.model1 <- (572+10+390)/(572+23+5+10+390)
-
-D1$precision.model1 <- (10+390)/(10+390)
-
-D1$recall.model1 <- (10+390)/(10+390+23+5)
-
+pred_table1 = table(D1$level.up, D1$threshold.pred1)
+pred_table1
+pred_table2 = table(D1$level.up, D1$threshold.pred2)
+pred_table2
+D1$accuracy.model1 <- (572+400)/(572+28+400)
+D1$accuracy.model2 <- (595+390)/(595+5+10+390)
+D1$precision.model1 <- (400)/(400)
+D1$precision.model2 <- (390)/(400)
+D1$recall.model1 <- (390)/(400+28)
+D1$recall.model2 <- (390)/(400+5)
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
 table1
+table2 <- table(D1$level.up, D1$threshold.pred2)
+table2
 #Convert to matrix
 matrix1 <- as.matrix(table1)
-
+matrix2 <- as.matrix(table2)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
-
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
 ```
