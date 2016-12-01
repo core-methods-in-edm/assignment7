@@ -72,7 +72,7 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-
+#Test
 ```
 
 
