@@ -1,25 +1,21 @@
----
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
-output: html_document
----
+library(tidyr, dplyr)
+library(corrplot)
+library(ggplot2)
+library(rpart)
+library(ROCR)
 
-In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
-#Upload data
-```{r}
 D1 <- read.table("online.data.csv", sep = ",", header = TRUE)
 D1$level.up2<-ifelse(D1$level.up=="no",0,1)
 D2 <- dplyr::select(D1, 2:6,8)
-```
-
-#Visualization 
-```{r}
-#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 D2 <- tidyr::gather(D2)
 names(D2) <- c("variable","value")
 g <- ggplot(D2,aes(x=value))
+#Facets divide a plot into subplots based on the values of one or more discrete variables
+#g+geom_histogram(binwidth = diff(range(D2$value))/2000)+facet_wrap(~variable, scales = "free")
+#code reference:  https://groups.google.com/forum/#!topic/ggplot2/rhPWQEFMx6A
+
 g + geom_histogram(data = D2[D2$variable == "av.assignment.score",], binwidth=0.01) +
   geom_histogram(data = D2[D2$variable == "forum.posts",], binwidth=1) +  
   geom_histogram(data = D2[D2$variable == "level.up2",], binwidth=1) +
@@ -28,6 +24,7 @@ g + geom_histogram(data = D2[D2$variable == "av.assignment.score",], binwidth=0.
   geom_histogram(data = D2[D2$variable == "pre.test.score",], binwidth=0.01) + 
   facet_wrap(~variable, scales = "free")
 #code reference: http://stackoverflow.com/questions/17271968/different-breaks-per-facet-in-ggplot2-histogram by user20650
+
 #Then visualize the relationships between variables
 D3 <- dplyr::select(D1, 2:6,8)
 COR <- cor(D3)
@@ -35,13 +32,15 @@ corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",
          tl.col="black", tl.cex=0.6, tl.srt=45, 
          addCoef.col="black", addCoefasPercent = TRUE,
          sig.level=0.01, insig = "blank")
+
 #Try to capture an intution about the data and the relationships
 #The post test score is highly related to the number of messages(0.94), and pre test score/prior knowledge(67), assignment score(76). the post test score is not the simple cut-line for level-up. 
-#I guess level-up is based on a combination of the most related variables to level.up2: messages + post.test.score + av.assignment.score
-```
-#Classification tree
-```{r}
+#I guess level-up is based on students' improvement = postTestScore - preTestScore, or a total = postTestScore + preTestScore, or a combination of the most related variables to level.up2: messages + post.test.score + av.assignment.score
+#D3$change <- D3$post.test.score - D3$pre.test.score
+#D3$total <- D3$post.test.score + D3$pre.test.score
+
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+#Sample <- dplyr::sample_frac(D1, 0.1, replace = TRUE)
 c.tree1 <- rpart(level.up ~ messages + post.test.score + av.assignment.score, method="class", data=D1,control=rpart.control(minsplit = 1, minbucket = 1, cp = 0.001))
 #Plot and generate a CP table for your tree 
 post(c.tree1, file = "tree1.ps", title = "tree1")
@@ -61,22 +60,24 @@ printcp(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 #Based on the classification tree1, the probability that a student level up is 400/1000 = 40%
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#mismatch1 <- dplyr::filter(D1, level.up2 != pred)
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
-
-library(ROCR)
-
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
+pred1 <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred1, "tpr", "fpr"),colorize=TRUE)
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred1,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 #[1] 1
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+#alright, let's have 3 of the least related variables to level.up2 to construct the second classification tree: forum.posts+pre.test.score+message
+
 c.tree2 <- rpart(level.up ~ forum.posts + pre.test.score + messages, method="class", data=D1)
 #Plot and generate a CP table for your tree 
 post(c.tree2, file = "tree2.ps", title = "tree2")
@@ -102,11 +103,10 @@ abline(0, 1, lty = 2)
 unlist(slot(performance(Pred2,"auc"), "y.values"))
 #[1] 0.8825125
 
-#I think model 1 is better because model 1 have larger Area Under the Curve, which indicates model 1 have higher accuracy. 
-```
-#Thresholds
-```{r}
-#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances 
+#capturing the most correct predictions against false positives. Then generate a new variable in your data set 
+#that classifies each student according to your chosen threshold.
 
 #Model1: from ROC1, we can set threshold.pred1 as 0
 threshold.pred1 = 0
@@ -132,10 +132,10 @@ table1
   accuracy2 <- (468+358)/(468+358+132+42) # 82.6%
   precision2 <- 358/(358+132) #73.06122%
   recall2 <- 358/(358+42) #89.5%
-
-#Finally, calculate Kappa for your model according to:
-
-#First generate the table of comparisons
+   
+  #Finally, calculate Kappa for your model according to:
+  
+  #First generate the table of comparisons
   table1 <- table(D1$level.up, D1$threshold.pred1)
 
 #Convert to matrix
@@ -154,7 +154,7 @@ kappa(matrix1, exact = TRUE)/kappa(matrix1)
 #For Model1, choosing another threshold not equal to 0.
 
 threshold.pred1 = 0.999
-D1$threshold.pred1 <- ifelse(D1$pred <= threshold.pred1, "no","yes") 
+D1$threshold.pred1 <- ifelse(D1$pred <= threshold.pred1, "no","yes")
 table1 <- table(D1$level.up, D1$threshold.pred1)
 table1
 #     no yes
@@ -168,7 +168,6 @@ recall1 <- 400/(400+0) #100%
 #Model2: from ROC2, we set the threshold.pred2b as 0.55
 threshold.pred2b = 0.4
 D1$threshold.pred2b <- ifelse(D1$pred2 <= threshold.pred2b, "no","yes") 
-#Now generate three diagnostics:
 table2b <- table(D1$level.up, D1$threshold.pred2b)
 table2b
 #     no yes
@@ -177,10 +176,6 @@ table2b
 accuracy2 <- (440+377)/(440+377+160+23) # 81.7%
 precision2 <- 377/(377+160) #70.20484%
 recall2 <- 377/(377+23) #94.25%
-#In Model 2, we get higher percentage of recall rate with threshold 2, having lower accuracy and percision rate as trade off. 
+#We get higher percentage of recall rate with threshold 2, having lower accuracy and percision rate as trade off. 
 #It depends on the context to determine the threshold. ex.In medical, recall rate is more important. 
-
-
-```
-
 
