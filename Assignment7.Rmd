@@ -6,73 +6,175 @@ output: html_document
 ---
 
 In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+#Load library
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(corrplot)
+library(rpart)
+library(ROCR)
+```
 
 #Upload data
-```{r}
 
+```{r}
+D1 <- read.table("online.data.csv", sep = ",", header = TRUE)
+head(D1)
+```
+
+#Data Wrangling
+
+```{r}
+#Delete id column
+D2 <- D1[,-1]
+#Convert level.up from yes and no to 1 and 0
+D2$level.up <- ifelse(D2$level.up == "yes", 1, 0)
+
+D3 <- gather(D2, "variable", "value", post.test.score:level.up, factor_key=TRUE)
+head(D3)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+p <- ggplot(data = D3, aes(x = value)) + geom_histogram()
+p + facet_wrap(~variable, scales = "free")
 
 #Then visualize the relationships between variables
+COR <- cor(D2)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 
-#Try to capture an intution about the data and the relationships
-
+#Try to capture an intuition about the data and the relationships
+#In general the number of forum posts do not have a high correlation with other variables. But it is interesting to see that the number of messages sent by student to other students is highly correlated to all other variables but forum post, especially highly correlated to post test score, with a value of 94. Other variables that are highly correlated to post test score includes pre test score, average assignment score, and level up. It is also worth mentioning that the average assignment score has a stronger correlation with level up compare to post test score and level up.
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
-#Plot and generate a CP table for your tree 
+#Plot and generate a CP table for your tree
+#Model1: Selected three variables messages, post.test.score, and av.assignment.score
+c.tree1 <- rpart(level.up ~ messages + post.test.score + av.assignment.score, method="class", data=D2, control=rpart.control(minsplit=1, minbucket=1, cp=0.005)) 
+
+printcp(c.tree1)
+
+post(c.tree1, file = "tree.ps", title = "Level Up: 0 - Remain the Same Level, 1 - Level Up")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D2$pred <- predict(c.tree1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
-library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(D2$pred, D2$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+# 1
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 
+#Plot and generate a CP table for your tree
+#Model2: Selected three variables messages, post.test.score, and pre.test.score
+c.tree2 <- rpart(level.up ~ messages + post.test.score + pre.test.score, method="class", data=D2, control=rpart.control(minsplit=1, minbucket=1, cp=0.005)) 
+
+printcp(c.tree2)
+
+post(c.tree2, file = "tree2.ps", title = "Level Up: 0 - Remain the Same Level, 1 - Level Up")
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+D2$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+#Plot the curve
+pred.detail2 <- prediction(D2$pred2, D2$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+#0.8866708
+
+#Comparing the two models: Model 1 is much better. The area under Model 1 is 1 compare to 0.8866708 under Model 2. This shows that the prediction by Model 1 is 100% true. Notice that the only change from Model 1 to Model 2 is avg.assignment.score is replaced with pre.test.score. This confirms the information in correlation plot that average assignment score is highly correlated with level up. 
 ```
+
 #Thresholds
 ```{r}
-#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-
-threshold.pred1 <- 
+#Look at the ROC plot for your second model.(Chose the second model instead of the first for more interesting result.) Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+threshold.pred2 <- 0.9
+#replicate D2 as D4 for comparison
+D4 <- D2
+total <- length(D4$pred2)
+D4$pred2.thrsd1 <- ifelse(D4$pred2<threshold.pred2, 0, 1)
+D4$compare <- D4$pred2.thrsd1 - D4$level.up
+agree <- length(which(D4$compare == 0))
+TP <- length(which(D4$pred2.thrsd1 == 1 & D4$level.up == 1))
+FP <- length(which(D4$pred2.thrsd1 == 1 & D4$level.up == 0))
+FN <- length(which(D4$pred2.thrsd1 == 0 & D4$level.up == 1))
 
 #Now generate three diagnostics:
+D4$accuracy.model2 <- agree/total
 
-D1$accuracy.model1 <-
+D4$precision.model2 <- TP/(TP+FP)
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+D4$recall.model2 <- TP/(TP+FN)
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(D4$level.up, D4$pred2.thrsd1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
+# does not yield a reasonable value (1.041832>1) so I calculated by hand, using the formula (Agreement - Expected Agreement)/(1-Expected Agreement)
+# by hand, I get 0.3511
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+threshold.pred2 <- 0.6
+#replicate D2 as D5 for comparison
+D5 <- D2
+total <- length(D5$pred2)
+D5$pred2.thrsd1 <- ifelse(D5$pred2<threshold.pred2, 0, 1)
+D5$compare <- D5$pred2.thrsd1 - D5$level.up
+agree <- length(which(D5$compare == 0))
+TP <- length(which(D5$pred2.thrsd1 == 1 & D5$level.up == 1))
+FP <- length(which(D5$pred2.thrsd1 == 1 & D5$level.up == 0))
+FN <- length(which(D5$pred2.thrsd1 == 0 & D5$level.up == 1))
+
+#Now generate three diagnostics:
+D5$accuracy.model2 <- agree/total
+
+D5$precision.model2 <- TP/(TP+FP)
+
+D5$recall.model2 <- TP/(TP+FN)
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(D5$level.up, D5$pred2.thrsd1)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+# does not yield a reasonable value (1.022909>1) so I calculated by hand, using the formula (Agreement - Expected Agreement)/(1-Expected Agreement)
+# by hand, I get 0.6964
+
+#Comparing the two thresholds, the threshold of 0.6 yields a better kappa. Therefore, this threshold is better.
 ```
 
 
