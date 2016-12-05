@@ -1,24 +1,41 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
+author: "Sam Pepe"
 date: "11/30/2016"
 output: html_document
 ---
 
 In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
-#Upload data
+#Upload data, take out id, and change level.up to binary 
 ```{r}
+ online<-read.csv("online.data.csv")
+ View(online)
+ online1<-online[,2:7]
+ online1$level.up<-ifelse(online1$level.up=="yes",1,0)
 
 ```
 
 #Visualization 
 ```{r}
-#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+#convert to long format 
+ online2<-tidyr::gather(online1,variable,value, 1:6)
+ library(ggplot2)
+ # creating histograms for all variables 
+ xx <- ggplot(online2,aes(x=value))
+ xx + geom_histogram(data = online2[online2$variable == "av.assignment.score",], binwidth=0.01) +
+    geom_histogram(data = online2[online2$variable == "forum.posts",], binwidth=1) +  
+    geom_histogram(data = online2[online2$variable == "level.up",], binwidth=1) +
+    geom_histogram(data = online2[online2$variable == "messages",], binwidth=1) + 
+    geom_histogram(data = online2[online2$variable == "post.test.score",], binwidth=0.01) +
+    geom_histogram(data = online2[online2$variable == "pre.test.score",], binwidth=0.01)  
+   facet_wrap(~variable, scales = "free")
+   # correlation matrix for all variables 
+CORS<-cor(online1)ORS<-cor(online1)
+corrplot(CORS, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, addCoef.col="black", addCoefasPercent = TRUE, sig.level=0.01, insig = "blank")
+# findings include strong positive relationships: post-test score vs messages (.94) av.assignment score vs messages (.71)
+# av. assignment score vs post test score (.76) level up vs post test score (.71) level up vs average assignment score (.8) 
 
-#Then visualize the relationships between variables
-
-#Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
@@ -30,48 +47,80 @@ In the following assignment you will be looking at data from an one level of an 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
-
-#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
-
+c.tree <- rpart(online1$level.up~ online1$messages+ online1$av.assignment.score+online1$progress, method="class", data=online1)
+ printcp(c.tree)
+ post(c.tree, file = "tree.ps", title = "Predict Levelup")
 library(ROCR)
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+library(rpart)
+ online1$prediction<-predict(c.tree)
+View(online1)
+online1$prediction<-predict(c.tree)[,2]
+View(online1)
+c.tree <- rpart(online1$level.up~ online1$messages+ online1$av.assignment.score+online1$progress, method="class", data=online1)
+online1$prediction<-predict(c.tree)[,2]
+c.tree1 <- rpart(level.up ~ post.test.score + messages + av.assignment.score, method="class", data=online1)
+ post(c.tree1, file = "tree1.ps", title = "Levelup predict")
+ online1$prediction2 <- predict(c.tree1, type = "prob")[,2]
+ View(online1)
+  unlist(slot(performance(pred.detail,"auc"), "y.values"))
+ c.tree2 <- rpart(level.up ~ messages +av.assignment.score + progress, method="class", data=online1)
+post(c.tree2, file = "tree2.ps", title = "Levelup predict")
+ online1$prediction3 <- predict(c.tree2, type = "prob")[,2]
+View(online1)
+
+
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(online1$prediction3, online1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+
+
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
-
+# Both models are highly accurate so it depends on the research question (what are the variables of interest) . It also depends on how #well the models would do on new data (the accuracy is high because it is being tested on the training data used to create the set of #rules)   
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+ online1$thresholdpredict1 <- ifelse(online1$prediction2 > 0.9, 1, 0)
+ threshold1 <- table(online1$level.up, online1$thresholdpredict1)
+ threshold1
 
-threshold.pred1 <- 
+ online1$accuracy.model1 <- (600+400)/1000)
+ online1$precision.model1 <- 400/(400 + 0)
+ online1$recall.model1 <- 400/(400 + 0)
+ matrix1 <- as.matrix(threshold1)
+ kappa(matrix1, exact = TRUE)/kappa(matrix1)
+ online1$thresholdpredict1 <- ifelse(online1$prediction2 > 0.5, 1, 0)
+ threshold1 <- table(online1$level.up, online1$thresholdpredict1)
+ online1$accuracy.model1 <- (600+400)/1000
+ online1$precision.model1 <- 400/(400 + 0)
+ online1$recall.model1 <- 400/(400 + 0)
+ matrix1 <- as.matrix(threshold1)
+ kappa(matrix1, exact = TRUE)/kappa(matrix1)
+ online1$thresholdpredict2 <- ifelse(online1$prediction3 > 0.5, 1, 0)
+ threshold2 <- table(online1$level.up, online1$thresholdpredict2)
+ threshold2
+ online1$accuracy.model2 <- (595+390)/1000
+ online1$precision.model2 <- 390/(390 + 10)
+ online1$recall.model2 <- 390/(390 + 10)
+ matrix2 <- as.matrix(threshold2)
+ kappa(matrix2, exact = TRUE)/kappa(matrix2)
+ online1$thresholdpredict2 <- ifelse(online1$prediction3 > 0.8, 1, 0)
+ threshold2 <- table(online1$level.up, online1$thresholdpredict2)
+ matrix2 <- as.matrix(threshold2)
+ kappa(matrix2, exact = TRUE)/kappa(matrix2)
 
-#Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds
+Both thresholds are very accurate for the given models.. little differentiation 
 
-D1$precision.model1 <- 
 
-D1$recall.model1 <- 
-
-#Finally, calculate Kappa for your model according to:
-
-#First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
-#Convert to matrix
-matrix1 <- as.matrix(table1)
-
-#Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
-
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
 ```
 
