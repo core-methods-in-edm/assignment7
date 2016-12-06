@@ -9,6 +9,9 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+D1 <- read.csv('/Users/Gemy/assignment7/online.data.csv')
+###Recode D1 level up to binary
+D1$level.up <- ifelse(D1$level.up == 'yes', 1, 0)
 
 ```
 
@@ -16,20 +19,75 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
-#Then visualize the relationships between variables
+library(ggplot2)
 
-#Try to capture an intution about the data and the relationships
+
+### Change to data long format
+
+library(tidyr)
+
+data_long <- gather(D1,'vars', 'value', 2:7)
+
+D2 <- data_long[-1]
+D2$value <- as.numeric(D2$value)
 
 ```
+
+# Plotting the histograms
+```{r}
+ggplot(D2,aes(value, ..density..)) + geom_histogram(binwidth = .1) + facet_wrap(~vars, scales = 'free')
+```
+
+#Then visualize the relationships between variables:
+```{r}
+
+### First take a look at correlation between variables:
+
+cor(D1)
+
+pairs(D2)
+
+### Take a look at high correlations in details with bigger plots
+## Messages on Pre-Test Scores 
+
+qplot(x = messages, y = pre.test.score, data = D1, main = "Message on Pre-Test Scores", margins = TRUE)
+## Messages on Post-Test Scores
+
+qplot(x = messages, y = post.test.score, data = D1, main = "Message on Post-Test Scores", margins = TRUE)
+
+## Messages on Average Assignment Score
+
+qplot(x = messages, y = av.assignment.score, data = D1, main = "Messages on Average Assignment Score", margins = TRUE)
+
+##Average Assignment Score on Post Test Scores:
+qplot(x = av.assignment.score, y = post.test.score, data = D1, main = "Average Assignment Score on Post Test Scores", margins = TRUE)
+
+
+```
+#Try to capture an intution about the data and the relationships
+
+# We notice high correlaion especially between number of messages and pre and post test scores, also number of messages and average assignment scores.
+#Average Assignment Score also seems to have high correlation with Post Test scores
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+#Use rpart package to generate a classification tree:
+library(rpart)
+tree1 <- rpart(level.up ~ messages + forum.posts + pre.test.score, method ='class', control = rpart.control(minsplit =1, minbucket =1, cp =0.001), data = D1)
+
+
 #Plot and generate a CP table for your tree 
+
+printcp(tree1)
+
+#Plot your tree
+post(tree1, file = "tree1.ps", title = "Students Level Up or NOT")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
@@ -41,24 +99,36 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+tree2 <- rpart(level.up ~ av.assignment.score + post.test.score, method ='class', control = rpart.control(minsplit =1, minbucket =1, cp =0.001), data = D1)
+printcp(tree2)
+post(tree2, file ='tree2.ps', title ="Students Level Up or Not Version 2")
+D1$pred2 <- predict(tree2, type ='prob')[,2]
+
+## Now generate ROC curve for the new model:
+#Plot the curve
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+
+##The second a  better model because the auc value is exactly 1, which indicates a better classifier/ better model. Regardless the first model is also very good with auc = 0.996
 
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+## According to the first ROC plot for my first model, it shows the probability threshold that balances captures the most correct prediction against fall positives are 0.1
 
-#Now generate three diagnostics:
+D1$threshold.pred1 <- ifelse(D1$pred > 0.1, 1, 0)
 
-D1$accuracy.model1 <-
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
 
 #Finally, calculate Kappa for your model according to:
 
@@ -71,8 +141,59 @@ matrix1 <- as.matrix(table1)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+## Kappa for matrix 1 = 1.103
+
+
+```
+## Generate 3 Diagnostics: 
+```{r}
+table1
+matrix1
 
 ```
 
+```{r}
 
+#Now generate three diagnostics for the first model: 
+
+D1$accuracy.model1 <- (571+398)/(571+29+2+398)
+#accuracy = 0.969 = 97% accuracy 
+D1$precision.model1 <- 571/(571+2)
+#precision =0/9966 = 99% = percentage of the prediction that are correct
+D1$recall.model1 <- 571/(571+29)
+#recall = 0.9517 = 95% of the positives/correct instances come from the model 
+
+
+```
+
+```{r}
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+D1$threshold.pred2 <- ifelse(D1$pred > 0.9, 1, 0)
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+              
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+## Kappa for matrix 2 = 1.128
+
+```
+
+#Now generate three diagnostics for the second model: 
+
+```{r}
+
+
+D1$accuracy.model2 <- (594+346)/(594+6+54+346)
+## accuracy = 0.94 = 94% accuracy 
+D1$precision.model2<- 594/(594+54)
+## precision =0.917 = 92% precision
+D1$recall.model2<- 594/(594+6)
+## recall = 0.99 = 99% corrects come from this model 
+```
+
+  
