@@ -9,70 +9,141 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+A1 <- read.csv("online.data.csv", sep = ",", header = TRUE)
+library(tidyr)
+```
 
+#Data wrangling
+```{r}
+library(dplyr)
+library(tidyr)
+A2 <- dplyr::select(A1, -1) #omit Column "id"
+A2$level.up <- ifelse(A2$level.up=="yes", 1, 0) #convert yes/no into 1/0
+A3 <- tidyr::gather(A2, "variables", "value", 1:6) #convert the wide version into the long version
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+ggplot(A3, aes(value))+
+   geom_histogram(data = A3[A3$variables=="post.test.score",], binwidth = 0.01)+
+   geom_histogram(data = A3[A3$variables=="pre.test.score",], binwidth = 0.01)+
+   geom_histogram(data = A3[A3$variables=="messages",], binwidth = 5)+
+   geom_histogram(data = A3[A3$variables=="forum.posts",], binwidth = 1)+
+   geom_histogram(data = A3[A3$variables=="av.assignment.score",], binwidth = 0.01)+
+   geom_histogram(data = A3[A3$variables=="level.up",], binwidth = 0.1)+
+   facet_wrap(~variables, scale="free")
+#A note for myself: 
+#(1) "~" (tilde) in R is used to separate the left- and right-hand sides in a model formula. "facet_wrap()" is a formula of the form rows ~ columns, so "~" separates the row variable from the column variable. Here, I add facets with contents in "variables" as the columns. Notice that because there are no rows as facets, there is nothing before the tilde character. (References: http://www.dummies.com/programming/r/how-to-add-facets-scales-and-options-in-ggplot2-in-r/ )
+#(2) HereSet scales to let axis limits vary across facets
+#(3) The order of geom_histogram() doesn't matter.
 
 #Then visualize the relationships between variables
+plot(A2) #the scatter plot between variables
 
-#Try to capture an intution about the data and the relationships
-
+COR <- cor(A2) # generate pairwise correlations
+library(corrplot)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank") #the correlation plot between variables
 ```
+*Try to capture an intution about the data and the relationships*
+"messages" has an unexpectedly high correlation with "post.test.score" and also highly correlates with the other variables while "forum.post" does not. It seems that direct communication between 5th grade students (e.g. messaging) is a more effective way than indirect communication (e.g. forum posting) to improve their grades of geography. However, as can be inferred from the histogram, most students send messages more frequently than posting questions on the forum. Therefore, it is still too early to conclude that messaging is more benefical than forum posing.
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+c.tree1 <- rpart(level.up ~ messages + post.test.score + av.assignment.score, method="class", data=A2, control = rpart.control(minsplit=1, minbucket=1, cp=0.01))
 #Plot and generate a CP table for your tree 
-
+printcp(c.tree1)
+post(c.tree1, file = "tree.ps", title = "predicting levels up")
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+A2$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(A2$pred, A2$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+c.tree2 <- rpart(level.up ~ pre.test.score + forum.posts, method="class", data=A2, control = rpart.control(minsplit=1, minbucket=1))
+printcp(c.tree2)
+post(c.tree2, file = "tree2.ps", title = "predicting levels up")
 
+A2$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(A2$pred2, A2$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+##Since AUC of c.tree1 is 1 which is greater than AUC of c.tree2, 0.818, c.tree1 is a better model to predict "levels up" than c.tree2.
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+A2$threshold.pred1 <- ifelse(A2$pred2>0.7, 1, 0) #c.tree1 is too perfect that A2$pred contains just 1 and 0, therefore I use my second model, c.tree2, here to fulfill the task.
 
 #Now generate three diagnostics:
+A4.1 <- dplyr::count(A2, level.up, threshold.pred1)
+A4.1$type <- ifelse(A4.1$level.up==1 & A4.1$threshold.pred1==1, "TP", ifelse(A4.1$level.up==1 & A4.1$threshold.pred1==0, "FN", ifelse(A4.1$level.up==0 & A4.1$threshold.pred1==1, "FP", "TN")))
 
-D1$accuracy.model1 <-
+A5 <- data.frame((A4.1[A4.1$type=="TP",]$n + A4.1[A4.1$type=="TN",]$n) / sum(A4.1$n)) #calculate accuracy
+names(A5) <- c("accuracy.model1")
 
-D1$precision.model1 <- 
+A5$precision.model1 <- A4.1[A4.1$type=="TP",]$n / (A4.1[A4.1$type=="TP",]$n + A4.1[A4.1$type=="FP",]$n) #calculate precision
 
-D1$recall.model1 <- 
+A5$recall.model1 <- A4.1[A4.1$type=="TP",]$n / (A4.1[A4.1$type=="TP",]$n + A4.1[A4.1$type=="TN",]$n) #calculate recall
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(A2$level.up, A2$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+A5$kappa.model1 <- kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+A2$threshold.pred2 <- ifelse(A2$pred2>0.6, 1, 0) #a new threshold 0.6
+
+A4.2 <- dplyr::count(A2, level.up, threshold.pred2)
+A4.2$type <- ifelse(A4.2$level.up==1 & A4.2$threshold.pred2==1, "TP", ifelse(A4.2$level.up==1 & A4.2$threshold.pred2==0, "FN", ifelse(A4.2$level.up==0 & A4.2$threshold.pred2==1, "FP", "TN")))
+
+A5$accuracy.model2 <- (A4.2[A4.2$type=="TP",]$n + A4.2[A4.2$type=="TN",]$n) / sum(A4.2$n)
+
+A5$precision.model2 <- A4.2[A4.2$type=="TP",]$n / (A4.2[A4.2$type=="TP",]$n + A4.2[A4.2$type=="FP",]$n)
+
+A5$recall.model2 <- A4.2[A4.2$type=="TP",]$n / (A4.2[A4.2$type=="TP",]$n + A4.2[A4.2$type=="TN",]$n)
+
+#New Kappa
+table2 <- table(A2$level.up, A2$threshold.pred2)
+matrix2 <- as.matrix(table2)
+A5$kappa.model2 <- kappa(matrix2, exact = TRUE)/kappa(matrix2)
 ```
 
+All four metrics of the two different thresholds are stored in data frame "A5". The comparision is shown below.
 
+accuracy.model1  precision.model1  recall.model1  kappa.model1
+      0.771        0.7111111        0.3735409      1.034764   
+accuracy.model2  precision.model2  recall.model2  kappa.model2
+      0.783        0.704698         0.4022989      1.056434
+
+   M2 better       M1 better         M2 better      M2 better
+
+Overall, model2 (threshold=0.6) is better than model1 (threshold=0.7) despite that M1 is slightly better than M2 in terms of precision. To put it in another way, although we will be more confident of the positive preditions we make if we choose M1, we will in the meantime exclude too many cases that should have been predicted as positive, i.e. more than a few students qualified for leveling up will be dragged down while M2 is not only more accurate regardless of whether being adjusted for random chance or not but encourages a more positive attitude towards students as well.
