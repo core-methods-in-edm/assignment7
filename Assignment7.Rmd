@@ -1,6 +1,6 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
+author: "Linh Doan"
 date: "11/30/2016"
 output: html_document
 ---
@@ -9,70 +9,201 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+M1 <- read.csv("online.data.csv", sep = ",", header = TRUE)
+#change level.up into numberic value No=0 and Y=1
+M1$level.up.numeric <- ifelse (M1$level.up == "no", 0, 1)
+#drop the original level.up variable 
+M1 <- M1 [-7]
 ```
 
 #Visualization 
 ```{r}
+#open a whole bunch of packages
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+#Change data to long form so that 
+data.long <-gather (M1,'variable','value',2:7)
+M2 <- data.long [-1]
+M2$value <-as.numeric(M2$value)
+```
+
+```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+ggplot(M2, aes (value,..count..)) + geom_histogram(alpha = 0.5, fill="green", col="blue") + facet_wrap (~variable, scales = 'free')
 
 #Then visualize the relationships between variables
+#dropping ID
+M3 <- M1 [-1]
+library(corrplot)
+COR <- cor(M3)
+corrplot (COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 
 #Try to capture an intution about the data and the relationships
+#It seems to me that level up correlates to av.assignement, messages and post.test.socore
+# On the other hand, messages are strongly correlated with post.test.score and also the average assignment score so I am not sure what is the third variable here.
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+library(party)
 
 #Plot and generate a CP table for your tree 
+c.tree <- rpart(M1$level.up.numeric~ M1$pre.test.score + M1$post.test.score + M1$av.assignment.score, method="class", data=M1) #Notice the standard R notion for a formula X ~ Y
+
+#Look at the error of this tree
+printcp(c.tree)
+#Root node error: 400/1000 = 0.4
+#n= 1000 
+
+#    CP nsplit rel error xerror     xstd
+#1 0.93      0      1.00   1.00 0.038730
+#2 0.07      1      0.07   0.07 0.013042
+#3 0.01      2      0.00   0.00 0.000000
+#Plot the tree
+post(c.tree, file = "tree.ps", title = "Level Up Graph where 1=Level and 0=Not able to level up")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+M1$pred <- predict(c.tree, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
-
+#install.packages("ROCR")
+#install.packages("gplots")
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(M1$pred, M1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance (pred.detail,"auc"), "y.values" ))
+# [1] 1
+
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree2 <- rpart(M1$level.up.numeric~ M1$pre.test.score + M1$forum.posts, method="class", data=M1) 
+printcp(c.tree2)
+#Root node error: 400/1000 = 0.4
+#n= 1000 
+
+#     CP nsplit rel error xerror     xstd
+#1 0.3925      0    1.0000 1.0000 0.038730
+#2 0.0300      1    0.6075 0.6075 0.033907
+#3 0.0200      2    0.5775 0.6100 0.033954
+#4 0.0150      3    0.5575 0.5975 0.033716
+#5 0.0100      4    0.5425 0.5825 0.033421
+#Plot the tree
+post(c.tree2, file = "tree2.ps", title = "Level Up Graph where 1=Level and 0=Not able to level up")
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+M1$pred2 <- predict(c.tree2, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+#install.packages("ROCR")
+#install.packages("gplots")
+library(ROCR)
+
+#Plot the curve
+pred.detail2 <- prediction(M1$pred2, M1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance (pred.detail2,"auc"), "y.values" ))
+# [1] 0.8180375
+
+# Model 1 is so much better, I mean... just look at the graph!!!
 
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
-
+M1$threshold.pred1 <- ifelse(M1$pred> 0.9, 1, 0) #very high threadhold
+table1 <- table(M1$threshold.pred1, M1$level.up.numeric)
+#      0   1
+#  0 600   0
+#  1   0 400
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
-
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+D1$accuracy.model1 <- (600+400)/1000
+# 100%
+D1$precision.model1 <- 400/(400+0)
+# 100%
+D1$recall.model1 <- 400/(400+0)
+# 100%
 
 #Finally, calculate Kappa for your model according to:
-
-#First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#[1] 1.153846
+
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+M1$threshold.pred2 <- ifelse(M1$pred> 0.2, 1, 0) #very low threadhold
+table2 <- table(M1$threshold.pred2, M1$level.up.numeric)
+#      0   1
+#  0 600   0
+#  1   0 400
+#Now generate three diagnostics:
+
+D1$accuracy.model1 <- (600+400)/1000
+# 100%
+D1$precision.model1 <- 400/(400+0)
+# 100%
+D1$recall.model1 <- 400/(400+0)
+# 100%
+
+#Finally, calculate Kappa for your model according to:
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#[1] 1.153846. It's not that much different!!!!
+####################################################
+#Let's try a different (worse) model?
+
+M1$threshold.pred3 <- ifelse(M1$pred2> 0.9, 1, 0) #very high threadhold
+table3 <- table(M1$threshold.pred3, M1$level.up.numeric)
+#Finally, calculate Kappa for your model according to:
+#Convert to matrix
+matrix3 <- as.matrix(table3)
+#Calculate kappa
+kappa(matrix3, exact = TRUE)/kappa(matrix3)
+#[1] 1
+
+### Then....
+
+
+M1$threshold.pred4 <- ifelse(M1$pred2> 0.2, 1, 0) #very low threadhold
+table4 <- table(M1$threshold.pred4, M1$level.up.numeric)
+#Finally, calculate Kappa for your model according to:
+#Convert to matrix
+matrix4 <- as.matrix(table4)
+#Calculate kappa
+kappa(matrix4, exact = TRUE)/kappa(matrix4)
+#[1] 0.9863223
+
+### Finally, we can see some differences here! It's because the first model was too good (overfit?), to show the difference in kappa here model 2 is better.
 ```
 
 
