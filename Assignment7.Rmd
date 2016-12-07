@@ -9,61 +9,100 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+A1<-read.table("online.data.csv", header = TRUE, sep = ",")
+library("ggplot2")
+install.packages("tidyr")
+install.packages("dplyr")
+library("tidyr")
+library("dplyr")
 ```
 
 #Visualization 
 ```{r}
+A1$level.up2<-ifelse(A1$level.up=="no",0,1)
+A2<-dplyr::select(A1, 2:6,8)
+A3<-tidyr::gather(A2)
+names(A3)<-c("variable","value")
+g<-ggplot(A3, aes(value))
+hist(A3$value, breaks = 100, ylim = c(0,4000))
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+geom_histogram(mapping = NULL, data = A3[A3$variable == "post.test.score",], binwidth = 1)
+geom_histogram(mapping = NULL, data = A3[A3$variable == "pre.test.score",], binwidth = 1)
+geom_histogram(mapping = NULL, data = A3[A3$variable == "messages",], binwidth = 1)
+geom_histogram(mapping = NULL, data = A3[A3$variable == "forum.posts",], binwidth = 1)
+geom_histogram(mapping = NULL, data = A3[A3$variable == "av.assignment.score",], binwidth = 1)
+facet_grid(.~variable)
 #Then visualize the relationships between variables
-
+A4<-dplyr::select(A1, 2:6,8)
+plot(A4)
+COR <- cor(A2)
+library(corrplot)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="blue", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 #Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+c.tree1 <- rpart(level.up2 ~ post.test.score + pre.test.score + messages + forum.posts + av.assignment.score, method="class", data=A2, control=rpart.control(minsplit = 1, minbucket = 1, cp = 0.0001))
+printcp(c.tree1)
 #Plot and generate a CP table for your tree 
-
+post(c.tree1, file = "tree1.ps", title = "")
+printcp(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+A2$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(A2$pred, A2$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
-
+c.tree2 <- rpart(level.up2 ~ pre.test.score + forum.posts, method="class", data=A2, control = rpart.control(minsplit=1, minbucket=1))
+printcp(c.tree2)
+A2$pred <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(A2$pred, A2$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+threshold.pred1 <- 0
 
 #Now generate three diagnostics:
+A2$threshold.pred1<- ifelse(A2$pred <= threshold.pred1, "no","yes")
 
-D1$accuracy.model1 <-
+T1 <- table(A2$level.up, A2$threshold.pred1)
+T1
+ #  no   yes
+ #0 600   0
+ #1 0     400
+#Accuracy: correct predictions/total predictions
+A2$accuracy.model1 <-(600+400)/(600+0+0+400)
 
-D1$precision.model1 <- 
+A2$precision.model1 <- 400/(600+400)
 
-D1$recall.model1 <- 
+A2$recall.model1 <- 400/(400+600)
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(A2$level.up, A2$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -72,7 +111,15 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-
+A2$threshold.pred2<- ifelse(A2$pred <= threshold.pred1, "no","yes")
+T2 <- table(A2$level.up, A2$threshold.pred2)
+T2
+A2$accuracy.model1 <-
+A2$precision.model1 <-
+A2$recall.model1 <-
+table2 <- table(A2$level.up, A2$threshold.pred2)
+matrix2 <- as.matrix(table2)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
 ```
 
 
