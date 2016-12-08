@@ -9,61 +9,112 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(rpart)
+setwd("~/Nino Zhang/study at TC/fall 2016/EDM/assig10/assignment7")
 
+data1 <- read.csv("online.data.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
+# change character vars "no", "yes" into 0 and 1
+data1$level.up <- sub("^(no).*", "0", data1$level.up)
+data1$level.up <- sub("^(yes).*", "1", data1$level.up)
+class(data1$level.up)
+# change character vars into numeric vars
+data1$level.up <- as.numeric(data1$level.up)
+class(data1$level.up)
+datanoid <- select(data1, -1)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+hist(data1$post.test.score, xlab = "post test score", main = "post test score")
+hist(data1$pre.test.score, xlab = "pret test score", main = "pre test score")
+hist(data1$messages, xlab = "messages", main = "messages")
+hist(data1$forum.posts, xlab = "forum post", main = "forum posts")
+hist(data1$av.assignment.score, xlab = "Average score", main = "avg score")
+hist(data1$level.up, xlab = "level up", main = "level up")
 
 #Then visualize the relationships between variables
-
 #Try to capture an intution about the data and the relationships
+cor_pairs <- cor(datanoid)
+corrplot(cor_pairs)
 
 ```
+The bigger the circle gets, the higher the correlation. Thus, messages have a high correlation with post test score, forum posts have very low correlation with other factors. 
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+post_test_score <- datanoid$post.test.score
+pre_test_score <- datanoid$pre.test.score
+messages <- datanoid$messages
+forum_posts <- datanoid$forum.posts
+avg_score <- datanoid$av.assignment.score
+level_up <- datanoid$level.up
+c.tree1 <- rpart(level_up ~ forum_posts + messages + pre_test_score, method="class", control = rpart.control(minsplit = 1, minbucket = 1, cp = 0.001), data=datanoid)
 #Plot and generate a CP table for your tree 
-
+printcp(c.tree1)
+plot(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
-
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
-
+datanoid$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+datanoid$pred[1:20]
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(datanoid$pred, datanoid$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+```
+```{r}
+#repeat the previous process
+c.tree2 <- rpart(level_up ~ post_test_score + avg_score, method="class", control = rpart.control(minsplit = 1, minbucket = 1, cp = 0.001), data=datanoid)
+#Plot and generate a CP table for your tree 
+printcp(c.tree2)
+plot(c.tree2)
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+datanoid$pred2 <- predict(c.tree2, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+datanoid$pred2[1:20]
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+
+#Plot the curve
+pred.detail2 <- prediction(datanoid$pred2, datanoid$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
 
 ```
+Since both AUCs of the two models are 0.9961771, they have the same performance.
+
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+datanoid$threshold.pred1 <- ifelse(datanoid$pred> 0.7, 1, 0)
 
 #Now generate three diagnostics:
+table1 <- table(datanoid$threshold.pred1, level_up)
+table1
+datanoid$accuracy.model1 <- (584+397)/1000
 
-D1$accuracy.model1 <-
+datanoid$precision.model1 <- 584/(584+16)
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+datanoid$recall.model1 <- 584/584+3
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(datanoid$level.up, datanoid$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -72,7 +123,55 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-
 ```
+Kappa should fall between 0 and 1, maybe it's because of the threshold
+```{r}
+datanoid$threshold.pred1_2 <- ifelse(datanoid$pred> 0.001, 1, 0)
+
+#Now generate three diagnostics:
+table2 <- table(datanoid$threshold.pred1_2, level_up)
+table2
+datanoid$accuracy.model2 <- (579+398)/1000
+
+datanoid$precision.model2 <- 579/(579+21)
+
+datanoid$recall.model2 <- 579/579+2
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(datanoid$level.up, datanoid$threshold.pred1_2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+```
+Kappa is still bigger than 1!!!
+```{r}
+datanoid$threshold.pred1_3 <- ifelse(datanoid$pred2> 0.00001, 1, 0)
+
+#Now generate three diagnostics:
+table3 <- table(datanoid$threshold.pred1_3, level_up)
+table3
+datanoid$accuracy.model3 <- (600)/1000
+
+datanoid$precision.model3 <- 600/(600+1)
+
+datanoid$recall.model3 <- 600/600
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table3 <- table(datanoid$level.up, datanoid$threshold.pred1_3)
+
+#Convert to matrix
+matrix3 <- as.matrix(table3)
+
+#Calculate kappa
+kappa(matrix3, exact = TRUE)/kappa(matrix3)
+```
+Kappa is still bigger than 1...?
 
 
