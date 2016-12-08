@@ -9,70 +9,203 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1 <- read.csv("~/Desktop/FALL_2016/Assignment7/online.data.csv")
 ```
 
 #Visualization 
 ```{r}
+#First, removed the id variable since it had no meanings other than identifying participants, changed level.up variable values into numeric varaible (no=0, yes=1). Then created the cleaned up data to use.
+D2 <- dplyr::select(D1,2:7)
+D2$level.up2 <- ifelse(D2$level.up == "no",0,1)
+D3 <- dplyr::select(D2,1:5,7)
+#Then in order to use it for creating ggplot, made the data into long data so that R can understand
+data_long <- tidyr::gather(D3,"value_name","value",1:6)
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+1.Started by opening packages.
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+2. creating different x and y axis for different variables since they mean different things and want different x/y axis for different variables.
+<note to myself: after value_name labeling and putting can comma can be the only way for R to distinguish different variables and their values/ one layers must contain all variables should be value_name this might be the reason why we made the data long to create one histogram>
+a <- ggplot(data_long, aes(x=value))
+a + geom_histogram(data = data_long[data_long$value_name == "post.test.score",], binwidth=0.01) +
+geom_histogram(data = data_long[data_long$value_name == "pre.test.score",], binwidth=0.01) +
+geom_histogram(data = data_long[data_long$value_name == "messages",], binwidth=10) +
+geom_histogram(data = data_long[data_long$value_name == "forum.posts",], binwidth=2) +
+geom_histogram(data = data_long[data_long$value_name == "av.assignment.score",], binwidth=0.01) +
+geom_histogram(data = data_long[data_long$value_name == "level.up2",], binwidth=0.01) + 
+facet_wrap(~value_name, scales = "free")
 #Then visualize the relationships between variables
-
+library(corrplot)
+COR <- cor(D3)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, 
++ addCoef.col="black", addCoefasPercent = TRUE, sig.level=0.50, insig = "blank")
 #Try to capture an intution about the data and the relationships
-
+Starting by the biggest number relationship, messages and post test scores showed the highest relationship. This showes that more interactions students have with other students in the class, students got the better grade. (Not to be suspicious, but I was wondering if students shared the answeres through message since this is online course; just my second thought). Also average assignment score and level up status was positively correlated. I coded level up yes as 1, so this relationship is understandable and makes sense; students who performs well might need advance education in geography. I was just interested in why forum post and message dose not have a high correlation since both are the outlet for students to communicate...
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+1. open relative package
+library(rpart)
+library(party)
+
+2.c.tree1 <- rpart(level.up2 ~ messages + post.test.score + pre.test.score, method="class", data=D3, control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
+
 #Plot and generate a CP table for your tree 
+printcp(c.tree1)
+Classification tree:
+rpart(formula = level.up2 ~ messages + post.test.score + pre.test.score, 
+    data = D3, method = "class", control = rpart.control(minsplit = 1, 
+        minbucket = 1, cp = 0.001))
+
+Variables actually used in tree construction:
+[1] messages        post.test.score pre.test.score 
+
+Root node error: 400/1000 = 0.4
+
+n= 1000 
+
+          CP nsplit rel error xerror     xstd
+1  0.6025000      0    1.0000 1.0000 0.038730
+2  0.0062500      1    0.3975 0.4400 0.030106
+3  0.0050000      4    0.3775 0.4425 0.030174
+4  0.0041667      5    0.3725 0.4700 0.030889
+5  0.0037500      8    0.3600 0.4825 0.031200
+6  0.0033333     14    0.3375 0.4875 0.031322
+7  0.0025000     22    0.3025 0.4875 0.031322
+8  0.0018750     77    0.1575 0.4825 0.031200
+9  0.0016667     81    0.1500 0.5000 0.031623
+10 0.0012500    112    0.0975 0.5000 0.031623
+11 0.0010714    162    0.0350 0.5200 0.032087
+12 0.0010000    171    0.0250 0.5200 0.032087
+
+3.code for tree ploting
+post(c.tree1, file = "tree.ps", title = "level_up_decision")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+D3$pred1 <- predict(c.tree1, type = "prob")[,2]
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
+pred1 <- prediction(D3$pred1, D3$level.up2) 
+plot(performance(pred1, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred1,"auc"), "y.values")) #Unlist liberates the AUC value from the "performance" object created by ROCR
+
+[1] 0.998925
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 
+As I mentioned previously I was interested in the difference between message and the forum post, so this time I used forum posts, average assignment score, and pre test score variable. 
+
+There were no significant difference in the values only 0.0016 differences, so either one is fine.
+
+c.tree2 <- rpart(level.up2 ~ forum.posts + av.assignment.score + pre.test.score, method="class", data=D3, control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
+printcp(c.tree2)
+
+Classification tree:
+rpart(formula = level.up2 ~ forum.posts + av.assignment.score + 
+    pre.test.score, data = D3, method = "class", control = rpart.control(minsplit = 1, 
+    minbucket = 1, cp = 0.001))
+
+Variables actually used in tree construction:
+[1] av.assignment.score forum.posts         pre.test.score     
+
+Root node error: 400/1000 = 0.4
+
+n= 1000 
+
+         CP nsplit rel error xerror     xstd
+1 0.9300000      0    1.0000 1.0000 0.038730
+2 0.0075000      1    0.0700 0.0700 0.013042
+3 0.0037500      3    0.0550 0.0600 0.012100
+4 0.0025000      7    0.0375 0.0675 0.012814
+5 0.0016667     13    0.0225 0.0525 0.011336
+6 0.0012500     16    0.0175 0.0525 0.011336
+7 0.0010000     18    0.0150 0.0525 0.011336
+post(c.tree2, file = "tree.ps2", title = "level_up_decision2")
+D3$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred2 <- prediction(D3$pred2, D3$level.up2) 
+plot(performance(pred2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred2,"auc"), "y.values"))
+[1] 0.9973688
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-
-threshold.pred1 <- 
+I have chosen the value of 0.9 since most of the variables are to the extreme...
+D3$threshold.pred1 <- ifelse(D3$pred1 > 0.9, 1, 0)
+table(D3$threshold.pred1, D3$level.up2)
+   
+      0   1
+  0 596  22
+  1   4 378
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D3$accuracy.model1 <- 
+(596+378)/(596+378+22+4) = 0.974                                                                                                                      
+D3$precision.model1 <-
+(378) / (378+22) = 0.945
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+D3$recall.model1 <- 
+(378) / (378+4) = 0.9895288
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(D3$threshold.pred1, D3$level.up2)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
+[1] 1.130513
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+I have chosen the value of 0.95 since most of the variables are to the extreme...
+
+D3$threshold.pred2 <- ifelse(D3$pred1 > 0.95, 1, 0)
+table(D3$threshold.pred2, D3$level.up2)
+   
+    0   1
+  0 599  62
+  1   1 338
+
+#Now generate three diagnostics:
+
+D3$accuracy.model2 <- 
+(599+338)/(599+1+62+338) = 0.937                                                                                                                   
+D3$precision.model2 <-
+(338) / (338+62) = 0.845
+
+D3$recall.model2 <- 
+(338) / (338+1) = 0.9970501
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(D3$threshold.pred2, D3$level.up2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+1.102105
 ```
+
 
 
