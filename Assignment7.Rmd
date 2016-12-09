@@ -170,8 +170,19 @@ table1 <- table(D3$threshold.pred1, D3$level.up2)
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+1.kappa(matrix1, exact = TRUE)/kappa(matrix1)
 [1] 1.130513
+2. Kappa value bigger than 1, so downloaded the package and re-calculated
+library(irr)
+kappa2(D3[,c(7,10)], "unweighted")
+ Cohen's Kappa for 2 Raters (Weights: unweighted)
+
+ Subjects = 1000 
+   Raters = 2 
+    Kappa = 0.758 
+
+        z = 29.5 
+  p-value = 0 
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
@@ -203,8 +214,19 @@ table2 <- table(D3$threshold.pred2, D3$level.up2)
 matrix2 <- as.matrix(table2)
 
 #Calculate kappa
-kappa(matrix2, exact = TRUE)/kappa(matrix2)
+1.kappa(matrix2, exact = TRUE)/kappa(matrix2)
 1.102105
+2.Recalculated the kappa value with irr package
+Cohen's Kappa for 2 Raters (Weights: unweighted)
+
+ Subjects = 1000 
+   Raters = 2 
+    Kappa = 0.362 
+
+        z = 24.3 
+  p-value = 0 
+
+Threshold 0.9 predicts better (ϰ=0.758) than 0.95 (ϰ=0.362) but this statement should be carefully interpreted since there might be a different threshold which might explain well.
 ```
 
 
