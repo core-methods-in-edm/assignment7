@@ -97,81 +97,97 @@ unlist(slot(performance(pred.detail,"auc"), "y.values"))
 Since both AUCs of the two models are 0.9961771, they have the same performance.
 
 #Thresholds
-```{r}
+```{r, warning=FALSE, echo=TRUE, include=FALSE}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-datanoid$threshold.pred1 <- ifelse(datanoid$pred> 0.7, 1, 0)
+#datanoid$threshold.pred1 <- ifelse(datanoid$pred> 0.7, 1, 0)
 
 #Now generate three diagnostics:
-table1 <- table(datanoid$threshold.pred1, level_up)
-table1
-datanoid$accuracy.model1 <- (584+397)/1000
+#table1 <- table(datanoid$threshold.pred1, level_up)
+#table1
+#datanoid$accuracy.model1 <- (584+397)/1000
 
-datanoid$precision.model1 <- 584/(584+16)
+#datanoid$precision.model1 <- 584/(584+16)
 
-datanoid$recall.model1 <- 584/584+3
+#datanoid$recall.model1 <- 584/584+3
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(datanoid$level.up, datanoid$threshold.pred1)
+#table1 <- table(datanoid$level.up, datanoid$threshold.pred1)
 
 #Convert to matrix
-matrix1 <- as.matrix(table1)
+#matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 ```
 Kappa should fall between 0 and 1, maybe it's because of the threshold
-```{r}
-datanoid$threshold.pred1_2 <- ifelse(datanoid$pred> 0.001, 1, 0)
+```{r, warning=FALSE, echo=TRUE, include=FALSE}
+#datanoid$threshold.pred1_2 <- ifelse(datanoid$pred> 0.001, 1, 0)
 
 #Now generate three diagnostics:
-table2 <- table(datanoid$threshold.pred1_2, level_up)
-table2
-datanoid$accuracy.model2 <- (579+398)/1000
+#table2 <- table(datanoid$threshold.pred1_2, level_up)
+#table2
+#datanoid$accuracy.model2 <- (579+398)/1000
 
-datanoid$precision.model2 <- 579/(579+21)
+#datanoid$precision.model2 <- 579/(579+21)
 
-datanoid$recall.model2 <- 579/579+2
+#datanoid$recall.model2 <- 579/579+2
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table2 <- table(datanoid$level.up, datanoid$threshold.pred1_2)
+#table2 <- table(datanoid$level.up, datanoid$threshold.pred1_2)
 
 #Convert to matrix
-matrix2 <- as.matrix(table2)
+#matrix2 <- as.matrix(table2)
 
 #Calculate kappa
-kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#kappa(matrix2, exact = TRUE)/kappa(matrix2)
 ```
 Kappa is still bigger than 1!!!
-```{r}
-datanoid$threshold.pred1_3 <- ifelse(datanoid$pred2> 0.00001, 1, 0)
+```{r, warning=FALSE, echo=TRUE, include=FALSE}
+#datanoid$threshold.pred1_3 <- ifelse(datanoid$pred2> 0.00001, 1, 0)
 
 #Now generate three diagnostics:
-table3 <- table(datanoid$threshold.pred1_3, level_up)
-table3
-datanoid$accuracy.model3 <- (600)/1000
+#table3 <- table(datanoid$threshold.pred1_3, level_up)
+#table3
+#datanoid$accuracy.model3 <- (600)/1000
 
-datanoid$precision.model3 <- 600/(600+1)
+#datanoid$precision.model3 <- 600/(600+1)
 
-datanoid$recall.model3 <- 600/600
+#datanoid$recall.model3 <- 600/600
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table3 <- table(datanoid$level.up, datanoid$threshold.pred1_3)
+#table3 <- table(datanoid$level.up, datanoid$threshold.pred1_3)
 
 #Convert to matrix
-matrix3 <- as.matrix(table3)
+#matrix3 <- as.matrix(table3)
 
 #Calculate kappa
-kappa(matrix3, exact = TRUE)/kappa(matrix3)
+#kappa(matrix3, exact = TRUE)/kappa(matrix3)
 ```
 Kappa is still bigger than 1...?
 
 
+
+
+
+
+##Tried the kappa2 function from irr package to compute kappa value.
+
+
+
+
+Take two, with the irr package
+```{r, warning=FALSE, echo=TRUE, include=TRUE}
+library(irr)
+kappa2(datanoid[,c(6,7)], "unweighted")
+```
+
+Here, kappa = 0.638, which is between 0 and 1. 
