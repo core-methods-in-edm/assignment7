@@ -23,18 +23,18 @@ D2<-dplyr::select(D2,2:3)
 #package
 library(ggplot2)
 #histogram plot
-#emember to ask why this don't work why??
+#remember to ask why this don't work why??
 #p <- ggplot(D2, aes=(value))
 #hist=p + geom_histogram(data = D2[D2$variable == "av.assignment.score",], binwidth=0.01) + geom_histogram(data = D2[D2$variable == "forum.posts",], binwidth=1) + geom_histogram(data = D2[D2$variable == "level.up",], binwidth=1) + geom_histogram(data = D2[D2$variable == "messages",], binwidth=1) + geom_histogram(data = D2[D2$variable == "post.test.score",], binwidth=0.01) + geom_histogram(data = D2[D2$variable == "pre.test.score",], binwidth=0.01)+ facet_wrap(~ variable,scales = "free")
 #histogram
-hist1 = ggplot(D2,aes(x=value)) + geom_histogram(binwidth = 0.1) + facet_wrap(~variable, scales = "free")
+hist1 = ggplot(D2,aes(x=value)) + geom_histogram() + facet_wrap(~variable, scales = "free")
 ##Note, remember to ask how to scale the x axis?? why do my post.test.score and pre.test.score look so weird
 #Then visualize the relationships between variables
 
 #Try to capture an intution about the data and the relationships （that is the correlation ）
 COR <- cor(D1)
 library(corrplot)
-corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, 
+corrplot(COR, order="AOE", method= "circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, 
         addCoef.col="black", addCoefasPercent = TRUE,
         sig.level=0.50, insig = "blank")
 #code from a4
@@ -57,7 +57,6 @@ printcp(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
-##question why the predict columns are still out of 1 and 0?
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
@@ -112,31 +111,62 @@ unlist(slot(performance(pred.detail2,"auc"), "y.values"))#Unlist liberates the A
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-
-# I thought we are supposed to chose a threshold that have biggest TP and while maintaining low FP. However something is wrong with my first ROC, the curve is all the way to the top it's like perfect. I don't know way. 
-threshold.pred1 <- 
-
+#for the first prediction, we seem to chose the perfect factors which make an 100% correct prediction so the any threshold >0 should produce perfect result:
+D1$threshold.pred1 <- ifelse(D1$pred > 0.6, 1, 0)
+# I will generate a new table where directly compares the prediciton and the actual result:
+t1 <- table(D1$level.up, D1$threshold.pred1)
+#     0   1
+#  0 600   0
+#  1   0 400
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- (600+400)/1000
 
-D1$precision.model1 <- 
+D1$precision.model1 <- 400/(400 + 0)
 
-D1$recall.model1 <- 
+D1$recall.model1 <- 400/(400 + 0)
 
 #Finally, calculate Kappa for your model according to:
 
-#First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
 #Convert to matrix
-matrix1 <- as.matrix(table1)
+matrix1 <- as.matrix(t1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
-
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+#1.153846
 
 ```
 
+```{r}
+#Now I will do the threshold for the second prediction model and the diagnostic metrics
+D1$threshold.pred2 <- ifelse(D1$pred2 > 0.6, 1, 0)
+# I will generate a new table where directly compares the prediciton and the actual result:
+t2 <- table(D1$level.up, D1$threshold.pred2)
+#     0   1
+#  0 563  37
+#  1  33 367
+#Now generate three diagnostics:
+
+D1$accuracy.model2 <- (563+367)/(563+37+33+367)
+#0.93
+D1$precision.model2 <- 367/(367 + 33)
+#0.9175
+D1$recall.model2 <- 563/(563 + 33)
+#0.9446309
+
+#Calculate Kappa for your model according to:
+#Convert to matrix
+matrix2 <- as.matrix(t2)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#1.089442
+
+# In our case, we are more concerned about false positive than false negative,b ecause our goal is to improve the passing rate, so to identify who is going to fail is like the most important part I think. So precision is more imporatnt than recall. 
+
+```
+
+
+
+```
 
