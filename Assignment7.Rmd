@@ -9,70 +9,218 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+#Set working directory
+#setwd("C:/Users/Magdalena Bennett/Dropbox/PhD Columbia/Fall 2016/Core Methods in EDM/assignment7")
 
+#Load data
+
+d <- read.csv(("online.data.csv"))
+
+names(d)
+
+d$level.up <- as.numeric(d$level.up)-1
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+library(ggplot2)
+library(dplyr)
+
+#We re-arrange the data to make it easier to use facets.
+d_reshape <-tidyr::gather(d,id,value)
+names(d_reshape) <- c("id","variable","value")
+d_reshape$value <- as.numeric(d_reshape$value)
+
+g <- ggplot(d_reshape, aes(x=value))
+g + geom_histogram() + facet_wrap(~ variable, scales="free")
+
 #Then visualize the relationships between variables
+library(corrplot)
+
+corr <- cor(d[,-1])
+
+corrplot(corr)
 
 #Try to capture an intution about the data and the relationships
-
 ```
+
+- Observing the correlation of the data, we can observe that the results in the pre-test are positively associated with the post-test score. However, there is an even higher association between the post-test score and the average assignment score, which seems reasonable, as average assignment scores capture how much the student is learning.
+- There seems to be a very strong positive correlation between number of messages betwen students and the post-test score, which might indicate that more engaged students who participate with their peers tend to do better in the final test as well.
+- Level up is, of course, correlated with the average assignment scores and the final test score.
+- Number of forum posts does not seem to hold a strong relationship with performance.
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+
+c.tree <- rpart(level.up ~ av.assignment.score + messages + post.test.score, data=d, method="class",
+               control = rpart.control(minsplit = 1, minbucket = 1, cp = 0.001))
 
 #Plot and generate a CP table for your tree 
 
+printcp(c.tree)
+print(c.tree)
+
+#Plot your tree
+
+post(c.tree, file = "ctree.ps", title = "Level Up")
+
+par(xpd = TRUE)
+plot(c.tree, compress = TRUE)
+text(c.tree, use.n = TRUE)
+
+
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+d$pred <- predict(c.tree, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(d$pred, d$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 
 ```
+
+- As we can see from the graph and the prediction, both post-test score and average assignments score perfectly predict whether a student levels up or not (which is kind of obvious, given that whether he or she is able to move to the next level depends on his or her performance on the course).
+
+- Now, I will only use informational data regarding "engagement of the student" (messages and forum posts) and their previous knowledge
+
+```{r}
+c.tree2 <- rpart(level.up ~ forum.posts + messages + pre.test.score, data=d, method="class",
+               control = rpart.control(minsplit = 1, minbucket = 1, cp = 0.001))
+
+#Plot and generate a CP table for your tree 
+
+printcp(c.tree2)
+print(c.tree2)
+
+#Plot your tree
+
+post(c.tree2, file = "ctree2.ps", title = "Level Up")
+
+par(xpd = TRUE)
+plot(c.tree2, compress = TRUE)
+text(c.tree2, use.n = TRUE)
+
+d$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+#Plot the curve
+pred.detail2 <- prediction(d$pred2, d$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+```
+
+- With our new model, we still get a good prediction!
+
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+threshold.pred1 <- 0.00001
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+#Prediction of 1 if over the threshold, and 0 otherwise
+d$pred1_class <- as.numeric(d$pred>threshold.pred1)
 
-D1$precision.model1 <- 
+#Number of correct predictions over total predictions
+accuracy.model1 <- sum(d$pred1_class==d$level.up)/length(d$pred1_class[!is.na(d$pred1_class)])
+accuracy.model1
 
-D1$recall.model1 <- 
+#Number of correct positives over total positives
+precision.model1 <- sum(d$pred1_class[d$pred1_class==1]==d$level.up[d$pred1_clas==1])/
+  sum(d$pred1_class[d$pred1_class==1])
+precision.model1
+
+#Number of correct positives over true positives + false negatives
+recall.model1 <- sum(d$pred1_class[d$pred1_class==1]==d$level.up[d$pred1_clas==1])/
+  (sum(d$pred1_class[d$pred1_class==1]==d$level.up[d$pred1_clas==1])+
+     sum(d$pred1_class[d$pred1_class==0]!=d$level_up[d$pred1_class==0]))
+recall.model1
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(d$level.up, d$pred1_class)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+po <- sum(diag(matrix1))/sum(matrix1)
+pe <- (sum(matrix1[,1])/sum(matrix1))*(sum(matrix1[1,])/sum(matrix1)) + 
+  (sum(matrix1[,2])/sum(matrix1))*(sum(matrix1[2,])/sum(matrix1))
+
+kappa <- (po-pe)/(1-pe)
+kappa
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
 ```
 
+- Because of the fact that the first model I chose perfectly predicts the outcome, kappa is one in this case, independent of the threshold I choose as long as its $<1$.
 
+- Let's try this with the second model and see what happens
+
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+threshold.pred2 <- 0.17
+
+#Now generate three diagnostics:
+
+#Prediction of 1 if over the threshold, and 0 otherwise
+d$pred2_class <- as.numeric(d$pred2>threshold.pred2)
+
+#Number of correct predictions over total predictions
+accuracy.model2 <- sum(d$pred2_class==d$level.up)/length(d$pred2_class[!is.na(d$pred2_class)])
+accuracy.model2
+
+#Number of correct positives over total positives
+precision.model2 <- sum(d$pred2_class[d$pred2_class==1]==d$level.up[d$pred2_clas==1])/
+  sum(d$pred1_class[d$pred2_class==1])
+precision.model2
+
+#Number of correct positives over true positives + false negatives
+recall.model2 <- sum(d$pred2_class[d$pred2_class==1]==d$level.up[d$pred2_clas==1])/
+  (sum(d$pred2_class[d$pred2_class==1]==d$level.up[d$pred2_clas==1])+
+     sum(d$pred2_class[d$pred2_class==0]!=d$level_up[d$pred2_class==0]))
+recall.model2
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(d$level.up, d$pred2_class)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+po <- sum(diag(matrix2))/sum(matrix2)
+pe <- (sum(matrix2[,1])/sum(matrix2))*(sum(matrix2[1,])/sum(matrix2)) + 
+  (sum(matrix2[,2])/sum(matrix2))*(sum(matrix2[2,])/sum(matrix2))
+
+kappa2 <- (po-pe)/(1-pe)
+kappa2
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+```
+
+- In this case, we have a model with perfect precision and recall, but it's slightly less than perfect in terms of accuracy compared to the first model, of course. Kappa2 is also less than 1 in this case.
