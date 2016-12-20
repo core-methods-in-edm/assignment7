@@ -9,15 +9,42 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+data2<-read.csv("online.data.csv")
 
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(tidyr)
+
+#http://www.cookbook-r.com/Graphs/Facets_(ggplot2)/
+
+data22<-data2[,2:7]
+data3<-gather(data22, Variable,value, 1:6)
+
+data3$value<-as.numeric(data3$value)
+h<-ggplot(data3, aes(x=value)) +
+    geom_histogram(binwidth=.5, colour="black", fill="white")
+
+h
+
+h + facet_grid(Variable ~ .)
 
 #Then visualize the relationships between variables
 
+h1<- ggplot(data22, aes(x=forum.posts, y=post.test.score)) +geom_point()
+h1
+
+h2<-ggplot(data22, aes(x=messages, y=post.test.score)) +geom_point()
+h2
+
+h3<-ggplot(data22, aes(x=pre.test.score, y=post.test.score)) +geom_point()
+h3
+
+h4<-ggplot(data22, aes(x=level.up, y=av.assignment.score))+geom_bar(position="dodge", colour="black", stat="identity")
+h4
 #Try to capture an intution about the data and the relationships
 
 ```
@@ -25,23 +52,32 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
-#Plot and generate a CP table for your tree 
+library(rpart)
 
+c.tree1 <- rpart(level.up ~ av.assignment.score + forum.posts + messages, method="class", data=data22, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
+
+#Plot and generate a CP table for your tree 
+post(c.tree1, file = "tree.ps", title = "Data")
+printcp(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+data22$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
+install.packages(ROCR)
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(data22$pred, data22$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
+#My ROC curve isn't working idon't know why
+
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+#unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 
@@ -50,20 +86,23 @@ unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC valu
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+threshold.pred1 <- .15
 
+data22$threshold.pred1<-ifelse(data22$pred <= threshold.pred1, "no", "yes")
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+TP<-sum(data22$threshold.pred == "yes")
+FP<- sum((data22$level.up == 0 )& (data22$threshold.pred1 == "yes"))
+FN<-sum((data22$level.up == 0 )& (data22$threshold.pred1 == "no"))
 
-D1$precision.model1 <- 
+data22$precision.model1 <- TP/(TP+FP)
 
-D1$recall.model1 <- 
+data22$recall.model1 <- TP /(TP+FN)
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(data22$level.up, data22$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -75,4 +114,33 @@ kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 ```
 
+
+```{r}
+
+threshold.pred2 <- .02
+
+data22$threshold.pred2<-ifelse(data22$pred <= threshold.pred2, "no", "yes")
+#Now generate three diagnostics:
+
+TP<-sum(data22$threshold.pred2 == "yes")
+FP<- sum((data22$level.up == 0 )& (data22$threshold.pred2 == "yes"))
+FN<-sum((data22$level.up == 0 )& (data22$threshold.pred2 == "no"))
+data22$precision.model2 <- TP/(TP+FP)
+
+data22$recall.model2 <- TP /(TP+FN)
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(data22$level.up, data22$threshold.pred2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+
+#I believe the higher the kappa the better similarity between the prediction and actual observation. And a higher threshold begets a higher kappa.The percentage agreement that would occur by chance is lower.
+```
 
