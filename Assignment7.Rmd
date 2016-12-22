@@ -9,70 +9,214 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+install.packages("readr")
+install.packages("ggplot2")
+install.packages("ROCR")
+```
 
+```{r}
+library(readr)
+s <- read_csv("online.data.csv")
+```
+remove id 
+```{r}
+s1 <- dplyr::select(s, -1)
+s1$level.up <- ifelse(s1$level.up=="yes", 1, 0)
+```
+wide to long format
+```{r}
+library(ggplot2)
+s2 <- tidyr::gather(s1, "variable", "value", 1:6)
 ```
 
 #Visualization 
+
+##Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 ```{r}
-#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
-#Then visualize the relationships between variables
-
-#Try to capture an intution about the data and the relationships
-
+#Rplot1
+ggplot(s2, aes(value))+
+   geom_histogram(data = s2[s2$variable=="post.test.score",], binwidth = 0.01)+
+   geom_histogram(data = s2[s2$variable=="pre.test.score",], binwidth = 0.01)+
+   geom_histogram(data = s2[s2$variable=="messages",], binwidth = 5)+
+   geom_histogram(data = s2[s2$variable=="forum.posts",], binwidth = 1)+
+   geom_histogram(data = s2[s2$variable=="av.assignment.score",], binwidth = 0.01)+
+   geom_histogram(data = s2[s2$variable=="level.up",], binwidth = 0.1)+
+   facet_wrap(~variable, scale="free")
 ```
+#Then visualize the relationships between variables
+```{r}
+#Rplot2
+plot(s1)
+```
+#Corelation plot
+```{r}
+#Rplot3
+COR <- cor(s1) 
+library(corrplot)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+```
+Messages has quite a strng relation ith post.test.score and even the others. while forum.posts dont have such strong corelations
+
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+rp <- rpart(level.up ~ messages + post.test.score + av.assignment.score, method="class", data=s1, control = rpart.control(minsplit=1, minbucket=1, cp=0.01))
+```
 
+```{r}
 #Plot and generate a CP table for your tree 
+printcp(rp)
+post(rp, file = "tree.ps", title = "predicting levels up")
+```
 
+```{r}
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+s1$pred <- predict(rp, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
 
+```{r}
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
-#Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+#Plot the curve - Rplot 4
+pred.detail <- prediction(s1$pred, s1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
-
-#Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
-
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
-
 ```
+
+```{r}
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+```
+
+```{r}
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+rp2 <- rpart(level.up ~ pre.test.score + forum.posts, method="class", data=s1, control = rpart.control(minsplit=1, minbucket=1))
+printcp(rp2)
+post(rp2, file = "tree2.ps", title = "predicting levels up")
+
+s1$pred2 <- predict(rp2, type = "prob")[,2]
+pred.detail2 <- prediction(s1$pred2, s1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+#Rplot5
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+##Since AUC of c.tree1 is 1 which is greater than AUC of c.tree2, 0.818, c.tree1 is a better model to predict "levels up" than c.tree2.
+```
+
+
+
+
 #Thresholds
+
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+s1$threshold.pred1 <- ifelse(s1$pred2>0.7, 1, 0) 
+#make a variable and choose may be say .7 as your limit value
+```
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+#Accuracy Model
+```{r}
+s3 <- dplyr::count(s1, level.up, threshold.pred1)
+```
 
-D1$precision.model1 <- 
+```{r}
+s3$type <- ifelse(s3$level.up==1 & s3$threshold.pred1==1, "TP", ifelse(s3$level.up==1 & s3$threshold.pred1==0, "FN", ifelse(s3$level.up==0 & s3$threshold.pred1==1, "FP", "TN")))
+```
 
-D1$recall.model1 <- 
+```{r}
+s4 <- data.frame((s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) / sum(s3$n))
+names(s4) <- c("accuracy.model1")
+```
 
+#precision model
+```{r}
+s4$precision.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="FP",]$n)
+```
+
+#recall model
+```{r}
+s4$recall.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) 
+```
+
+
+```{r}
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(s1$level.up, s1$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+s4$kappa.model1 <- kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
 ```
 
+#Now choose a different threshold value and repeat these diagnostics. Threshold now is 0.6. Before threshold was 0.7
 
+
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+s1$threshold.pred1 <- ifelse(s1$pred2>0.6, 1, 0) 
+#make a variable and choose may be say .7 as your limit value
+```
+
+#Now generate three diagnostics:
+
+#Accuracy Model
+```{r}
+s3 <- dplyr::count(s1, level.up, threshold.pred1)
+```
+
+```{r}
+s3$type <- ifelse(s3$level.up==1 & s3$threshold.pred1==1, "TP", ifelse(s3$level.up==1 & s3$threshold.pred1==0, "FN", ifelse(s3$level.up==0 & s3$threshold.pred1==1, "FP", "TN")))
+```
+
+```{r}
+s5 <- data.frame((s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) / sum(s3$n))
+names(s4) <- c("accuracy.model1")
+```
+
+#precision model
+```{r}
+s5$precision.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="FP",]$n)
+```
+
+#recall model
+```{r}
+s5$recall.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) 
+```
+
+
+```{r}
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(s1$level.up, s1$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+s5$kappa.model1 <- kappa(matrix1, exact = TRUE)/kappa(matrix1)
+```
+
+threshold value of 0.6 looks definitely more better than 0.7 because of the final results
