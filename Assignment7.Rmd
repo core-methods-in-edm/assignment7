@@ -190,7 +190,24 @@ matrix2 <- as.matrix(table2)
 kappa(matrix2, exact = TRUE)/kappa(matrix2)
 =1.125014
 
-#What conclusions can you draw about your two thresholds? Threshold one used a small number (.14), whereas threshold two used a large number (.948).  Accuracy slightly decreased from threshold 1 to 2, but precision decreased by .21.  While recall experienced a slight gain.  I am unsure of what I can draw from Kappa, as it is greater than 1. I can say that Kappa slightly increased as a result of increasing the threshold, but that's about it.  To my understanding a Kappa grater than one is not the result you are looking for.  In general(kappa) the higher the better, but I am unsure how that plays in this context.  Maybe there is some kind of package I can use to get better results?  
+#Used the package suggested by Dr. Lang 
+
+ibrary(irr)
+
+#kappa2(D1[,c(x,y)], "unweighted")
+#Where “x” and “y” are the column numbers of your observed (level up) and predicted variables (threshold predict)
+
+#Threshold 1
+kappa2(D4[,c(6,9)], "unweighted")
+=0.94
+
+#Threshold 2
+kappa2(D4[,c(6,10)], "unweighted")
+=0.812
+
+#What conclusions can you draw about your two thresholds? 
+
+#I used two thresholds at opposite ends of the spectrum so it's hard to make clear conclusions. By increasing the threshold accuracy decreased, precision decreased, and recall increased.  This resulted in Kappa lowering by .128.  This shows that the reliability of the data went down as a result of this threshold.  I think this is because the threshold took too many values with it.  By decreasing the total number of values, it may affect Kappa, I presume this also depends on the types of value the thresholds delete.  I would like to also say that although Kappa decreased,0.812 is still a good Kappa and should be considered.  
 
 ```
 
