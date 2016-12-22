@@ -9,6 +9,7 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+C1 <- read.csv("online.data.csv")
 
 ```
 
@@ -16,63 +17,184 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+library(reshape2)
+library(plotly)
+library(tidyr)
+#data is in wide and needs to be in long, variable names need to be on top of eachother in column
+
+#take out ID first, to remove a column we can use subset and a - befor C(<columnname>)
+C2 <- subset(C1,select=-c(id))
+
+C2$level.up <- ifelse(C2$level.up == "no",0,1)
+View(C2)
+
+#need to scale the data, but make sure to set it up as.data.frame
+C3 <- as.data.frame(scale(C2))
+View(C3)
+
+#for the facet to work, data needs to be in "long" form. Gather function moves columns to new row, tidyr::gather(data,variablecolumnname,datacolumnname,whichcolumnsfromoriginaltopull)
+C4 <- tidyr::gather(C3,variable,value,1:6) 
+
+View(C4)
+
+#facet
+library(ggplot2)
+
+hist1 = ggplot(C4,aes(x=value)) + geom_histogram(binwidth = 0.1) + facet_wrap(~variable, scales = "free")
+hist1
+
 #Then visualize the relationships between variables
+library(corrplot)
+
+pairs(C3)
+
+cor1 <- cor(C3)
+
+corrplot(cor1, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, addCoef.col="black", addCoefasPercent = TRUE, sig.level=0.50, insig = "blank")
 
 #Try to capture an intution about the data and the relationships
+#The strongest correlation is between messages and post test score. Average assignment score has a high correlation with level up
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up ~ messages + forum.posts + av.assignment.score, method="class" , data = C2, control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
 
+printcp(c.tree1)
 #Plot and generate a CP table for your tree 
+
+plot(c.tree1)
+text(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+C2$pred <- predict(c.tree1, type = "prob")[,2]
+View(C2)
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(C2$pred, C2$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+pred <- prediction(C2$pred, C2$level.up)
+unlist(slot(performance(pred,"auc"), "y.values"))
+# Area Under Curve = 0.9959375
 
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+#Now repeat this process, but using the variables you did not use for the previous model 
+c.tree2 <- rpart(level.up ~ pre.test.score + post.test.score, method="class" , data = C2, control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
+
+printcp(c.tree2)
+#Plot and generate a CP table for your tree 
+
+plot(c.tree2)
+text(c.tree2)
+
+C2$pred2 <- predict(c.tree2, type = "prob")[,2]
+View(C2)
+
+pred.detail2 <- prediction(C2$pred2, C2$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+pred2 <- prediction(C2$pred2, C2$level.up)
+unlist(slot(performance(pred2,"auc"), "y.values"))
+#Area Under Curve .9740771
+
+#compare the plots & results of your two models. Which one do you think was the better model? Why?
+#Both results seem pretty good, though the area under the curve is larger (.9959375) when predicting using messages, forum posts, and avg.assignmentscore, than when using just pretest and posttest scores (.9740771).
 
 ```
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+C2$threshold.pred1 <- ifelse(C2$pred>.65, 1, 0)
+View(C2)
+
+tableA <- table(C2$level.up, C2$threshold.pred1) 
+tableA
+
+#      0   1
+#  0 595   5
+#  1   0 400
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+C2$accuracy.model1 <- (595+400)/(595+400+5) #0.995
 
-D1$precision.model1 <- 
+C2$precision.model1 <- (400)/(400+0) #1.00
 
-D1$recall.model1 <- 
+C2$recall.model1 <- (400)/(400+5) #.9876543
 
 #Finally, calculate Kappa for your model according to:
 
-#First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
 #Convert to matrix
-matrix1 <- as.matrix(table1)
+matrix1 <- as.matrix(tableA)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+C2$threshold2.pred <- ifelse(C2$pred>.90, 1, 0)
+View(C2)
+
+tableB <- table(C2$level.up, C2$threshold2.pred) 
+tableB
+#TableB and TableA are the same with a threshold of .65 and .9, so the diagnostics are going to be the same. This is a result of the probabilities being either 1, 0, or .9874
+
+#I'm going to try this on my second model instead, because there is more variation in the probabilities
+
+C2$threshold1.pred2 <- ifelse(C2$pred2>.65, 1, 0)
+View(C2)
+
+tableC <- table(C2$level.up, C2$threshold1.pred2) 
+tableC
+
+#      0   1
+#  0 555  45
+#  1  27 373
+
+C2$accuracy.model2 <- (555+373)/(555+45+27+373) #0.928
+
+C2$precision.model2 <- (373)/(373+27) #0.9325
+
+C2$recall.model2 <- (373)/(373+45) #0.8923
+
+
+#Threshold of .9 on the second model
+C2$threshold2.pred2 <- ifelse(C2$pred2>.9, 1, 0)
+View(C2)
+
+tableD <- table(C2$level.up, C2$threshold2.pred2) 
+tableD
+
+#    0   1
+#  0 596   4
+#  1 187 213
+
+C2$accuracy2.model2 <- (596+213)/(596+4+187+213) #0.809
+
+C2$precision2.model2 <- (213)/(213+187) #0.5325
+
+C2$recall2.model2 <- (213)/(213+4) #0.9815
+
+#As we change the threshold on the second model to become higher (from .65 to .9), the accuracy of the model decreases. The precision of the model also decreases, as there are more false positives. But, the recall increases, as there is a lower percentage of false negatives.
+
+matrix2 <- as.matrix(tableD)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+#Again I get a kappa of >1, based on my reading (aka wikipedia) these kappa values should be between 0 and 1. Not quite sure what's going on here....
 ```
 
 
