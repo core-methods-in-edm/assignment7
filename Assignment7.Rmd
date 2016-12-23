@@ -14,6 +14,7 @@ library(dplyr)
 library(corrplot)
 library(rpart)
 library(ROCR)
+library(irr)
 ```
 
 #Upload data
@@ -137,9 +138,11 @@ table1 <- table(D4$level.up, D4$pred2.thrsd1)
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#kappa2(matrix1, exact = TRUE)/kappa(matrix1)
 # does not yield a reasonable value (1.041832>1) so I calculated by hand, using the formula (Agreement - Expected Agreement)/(1-Expected Agreement)
 # by hand, I get 0.3511
+kappa2(D4[,c(6,9)], "unweighted")
+#Kappa = 0.351 (verified)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
@@ -173,7 +176,8 @@ matrix2 <- as.matrix(table2)
 kappa(matrix2, exact = TRUE)/kappa(matrix2)
 # does not yield a reasonable value (1.022909>1) so I calculated by hand, using the formula (Agreement - Expected Agreement)/(1-Expected Agreement)
 # by hand, I get 0.6964
-
+kappa2(D5[,c(6,9)], "unweighted")
+#Kappa = 0.696 (verified)
 #Comparing the two thresholds, the threshold of 0.6 yields a better kappa. Therefore, this threshold is better.
 ```
 
