@@ -9,14 +9,38 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1<-read.csv("~/Documents/VLB SCHOOL - ALL/TC.CU.2015-16/Learning Analytics FALL2016/Projects/Assignment#7/online.data.csv")
 ```
 
 #Visualization 
 ```{r}
+#gotta data wrangle
+library(tidyr)
+
+#don't need first column id
+D1<-D1[,2:7]
+
+#ggplot needs dat in a long form
+D2<-tidyr::gather(D1,variable,value, 1:6)
+
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+library(ggplot2)
+
+#for x-axis plot value
+t <- ggplot(D2,aes(x=value))
+
+#for y-axis plot value / checked my code with Jing's code
+hist= t + geom_histogram(data = D2[D2$variable == "av.assignment.score",], binwidth=0.01) + geom_histogram(data = D2[D2$variable == "forum.posts",], binwidth=1) + geom_histogram(data = D2[D2$variable == "level.up",], binwidth=1) + geom_histogram(data = D2[D2$variable == "messages",], binwidth=1) + geom_histogram(data = D2[D2$variable == "post.test.score",], binwidth=0.01) + geom_histogram(data = D2[D2$variable == "pre.test.score",], binwidth=0.01)+ facet_wrap(~ variable,scales = "free")
+
+# Important for me to know: 
+# Most displays are roughly rectangular, so if you have a categorical variable with many levels, it doesn't make sense to try and display them all in one row (or one column). To solve this dilemma, facet_wrap wraps a 1d sequence of panels into 2d, making best use of screen real estate.
+
 #Then visualize the relationships between variables
+
+cor<-cor(D1)
+library(corrplot)
+corrplot(cor, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, addCoef.col="black", addCoefasPercent = TRUE, sig.level=0.01, insig = "blank")
 
 #Try to capture an intution about the data and the relationships
 
@@ -25,17 +49,35 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+library(rpart)
+library(party)
+#this is not familiar and I have looked at Jing's code
+c.tree1 <- rpart(level.up ~ av.assignment.score + post.test.score + messages, method="class", data=D1, control=rpart.control(minsplit=1, minbucket=1,cp=0.0001 ))
+
+#Look at the error of this tree; examine the results
+printcp(c.tree1)
+
 #Plot and generate a CP table for your tree 
+post(c.tree1, file = "tree1.ps", title = "Student Level up")    
+
+
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
+-D1$pred <- predict(rp, type = "prob")[,2]
+
+
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+D1$pred1 <- predict(c.tree1, type = "prob")[,2]
 
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 
 library(ROCR)
+#can't go further can't locate this library!
 
 #Plot the curve
+-pred.detail <- prediction(D1$pred, D1$level.up) 
 pred.detail <- prediction(D1$pred, D1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
