@@ -1,6 +1,6 @@
 ---
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
+title: "VisualizationsTreesDiagnostics"
+author: "Charles Lang and Shreya Goel"
 date: "11/30/2016"
 output: html_document
 ---
