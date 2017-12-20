@@ -1,0 +1,107 @@
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+#Upload data
+```{r}
+D1 <- read.csv("~/Documents/RStudio/assignment7-Yuwen/online.data.csv", header = TRUE)
+library(rpart)
+library(ggplot2)
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+#Then visualize the relationships between variables
+
+#Try to capture an intution about the data and the relationships
+ggplot(data = D1, aes(x = post.test.score)) + geom_histogram() + facet_grid(level.up ~.)
+ggplot(data = D1, aes(x = pre.test.score)) + geom_histogram() + facet_grid(level.up ~.)
+ggplot(data = D1, aes(x = messages)) + geom_histogram() + facet_grid(level.up ~.)
+ggplot(data = D1, aes(x = forum.posts)) + geom_histogram() + facet_grid(level.up ~.)
+ggplot(data = D1, aes(x = av.assignment.score)) + geom_histogram() + facet_grid(level.up ~.)
+```
+#Classification tree
+
+```{r}
+rp <- rpart(level.up ~ messages +forum.posts +av.assignment.score, method="class", data = D1)
+printcp(rp)
+post(rp, file = "tree1.ps")
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+install.packages("ROCR")
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+```
+
+```{r}
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+rp2 <- rpart(level.up ~ messages +post.test.score +pre.test.score, method="class", data = D1)
+printcp(rp2)
+post(rp2, file = "tree2.ps")
+D2$pred <- predict(rp2, type = "prob")[,2]
+
+pred.d2 <- prediction(D2$pred, D2$level.up) 
+plot(performance(pred.d2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.d2,"auc"), "y.values"))
+```
+## The closer AUC for a model comes to 1, the better it is. Thus, model 1 is better.
+
+
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+D1$threshold.pred1 <- ifelse(D1$pred >=0.80, 1,0) 
+
+#Now generate three diagnostics:
+#First generate the table of comparisons
+
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+D1$accuracy.model1 <- 0.4
+
+D1$precision.model1 <- 0.975
+
+D1$recall.model1 <- 0.395
+
+#Finally, calculate Kappa for your model according to:
+
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+```
+
+```{r}
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+D1$threshold.pred2 <- ifelse(D1$pred >=0.2, 1,0) 
+
+
+#First generate the table of comparisons
+table2 <- table(D1$level.up, D1$threshold.pred2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+```
+
+# Kappa dropped from 1.141137 to 1.105136. I think the first one with 0.8 was better. 
