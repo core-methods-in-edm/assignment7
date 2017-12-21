@@ -1,0 +1,135 @@
+---
+title: "He Zhang-Assignment 7"
+author: "He Zhang"
+date: "11/28/2017"
+output: html_document
+---
+
+#Upload data
+```{r}
+D1<-read.csv("~/Desktop/2017 Fall/EDM/He Zhang-Assignment 7/online.data.csv")
+D1<-D1[2:7]
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(reshape2)
+library(ggplot2)
+library(corrplot)
+head(melt(D1))
+ggplot(data=melt(D1), mapping=aes(x=value))+geom_histogram(bins=10)+facet_wrap(~variable, scales = 'free_x')
+#Then visualize the relationships between variables
+pairs(D1)
+corrplot(cor(D1[, 1:5], D1[, 1:5]), method="circle")
+
+#Try to capture an intution about the data and the relationships
+#From both the pairs scatterplot and corrplot, we can tell that there are generally positive relationships between the variables.
+```
+
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up~forum.posts+pre.test.score+messages, method="class", data=D1)
+
+#Plot and generate a CP table for your tree 
+printcp(c.tree1)
+post(c.tree1, file = "tree1.ps", title = "MOOC")
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+install.packages("ROCR")
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+roc.perf<- performance(pred.detail, "tpr", "fpr")
+plot(roc.perf)
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+#The area under the curve is 0.88.
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+library(rpart)
+c.tree2 <- rpart(level.up~forum.posts+av.assignment.score+messages, method="class", data=D1)
+printcp(c.tree2)
+post(c.tree2, file = "tree2.ps", title = "MOOC")
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+##The area under the curve is 0.995. Compared to the first model, the second model is better because the area under the curve (0.995) is larger than the one in the first model (0.88).
+
+```
+
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+print(opt.cut(roc.perf, pred.detail))
+##The optimal cutoff point is 0.61.
+
+#classify students
+D1$threshold.pred1 <-ifelse(D1$pred>0.61, "yes", "no")
+  
+#Now generate three diagnostics:
+confusion<-table(D1$level.up, D1$threshold.pred1)
+confusion
+tp <- confusion[1, 1]
+fn <- confusion[1, 2]
+fp <- confusion[2, 1]
+tn <- confusion[2, 2]
+D1$accuracy.model1 <-ifelse(D1$threshold.pred1==D1$level.up, 1,0)
+accuracy.model1<-sum(D1$accuracy.model1==1)/nrow(D1)
+precision.model1 <- tp / (tp + fp)
+recall.model1 <- tp / (tp + fn)
+print(accuracy.model1)
+print(precision.model1)
+print(recall.model1)
+##Accuracy of Model 1 is 0.826, precision is 0.92, recall is 0.78.
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D1$threshold.pred2 <-ifelse(D1$pred>0.7, "yes", "no")
+confusion<-table(D1$level.up, D1$threshold.pred2)
+confusion
+tp <- confusion[1, 1]
+fn <- confusion[1, 2]
+fp <- confusion[2, 1]
+tn <- confusion[2, 2]
+D1$accuracy.model12 <-ifelse(D1$threshold.pred2==D1$level.up, 1,0)
+accuracy.model12<-sum(D1$accuracy.model12==1)/nrow(D1)
+precision.model12 <- tp / (tp + fp)
+recall.model12 <- tp / (tp + fn)
+print(accuracy.model12)
+print(precision.model12)
+print(recall.model12)
+
+##Compared to the threshold at 0.7, the threshold is more accurate(0.826>0.772), more precise (0.917>0.748), but less sensitive(recall: 0.78<0.935).
+```
