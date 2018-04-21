@@ -7,7 +7,7 @@ output: html_document
 
 In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
-#Upload data
+### Upload data
 ```{r}
 install.packages("readr")
 install.packages("ggplot2")
@@ -29,9 +29,9 @@ library(ggplot2)
 s2 <- tidyr::gather(s1, "variable", "value", 1:6)
 ```
 
-#Visualization 
+# Visualization 
 
-##Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+### Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 ```{r}
 #Rplot1
 ggplot(s2, aes(value))+
@@ -43,12 +43,12 @@ ggplot(s2, aes(value))+
    geom_histogram(data = s2[s2$variable=="level.up",], binwidth = 0.1)+
    facet_wrap(~variable, scale="free")
 ```
-#Then visualize the relationships between variables
+### Then visualize the relationships between variables
 ```{r}
 #Rplot2
 plot(s1)
 ```
-#Corelation plot
+# Corelation plot
 ```{r}
 #Rplot3
 COR <- cor(s1) 
@@ -61,7 +61,7 @@ tl.col="black", tl.cex=0.6, tl.srt=45,
 Messages has quite a strng relation ith post.test.score and even the others. while forum.posts dont have such strong corelations
 
 
-#Classification tree
+# Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 library(rpart)
@@ -118,7 +118,7 @@ unlist(slot(performance(pred.detail2,"auc"), "y.values"))
 
 
 
-#Thresholds
+## Thresholds
 
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
@@ -143,12 +143,12 @@ s4 <- data.frame((s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) / sum(s3$n))
 names(s4) <- c("accuracy.model1")
 ```
 
-#precision model
+# precision model
 ```{r}
 s4$precision.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="FP",]$n)
 ```
 
-#recall model
+# recall model
 ```{r}
 s4$recall.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) 
 ```
@@ -169,7 +169,7 @@ s4$kappa.model1 <- kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 ```
 
-#Now choose a different threshold value and repeat these diagnostics. Threshold now is 0.6. Before threshold was 0.7
+#### Now choose a different threshold value and repeat these diagnostics. Threshold now is 0.6. Before threshold was 0.7
 
 
 ```{r}
@@ -179,9 +179,9 @@ s1$threshold.pred1 <- ifelse(s1$pred2>0.6, 1, 0)
 #make a variable and choose may be say .7 as your limit value
 ```
 
-#Now generate three diagnostics:
+### Now generate three diagnostics:
 
-#Accuracy Model
+# Accuracy Model
 ```{r}
 s3 <- dplyr::count(s1, level.up, threshold.pred1)
 ```
@@ -195,12 +195,12 @@ s5 <- data.frame((s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) / sum(s3$n))
 names(s4) <- c("accuracy.model1")
 ```
 
-#precision model
+# precision model
 ```{r}
 s5$precision.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="FP",]$n)
 ```
 
-#recall model
+# recall model
 ```{r}
 s5$recall.model1 <- s3[s3$type=="TP",]$n / (s3[s3$type=="TP",]$n + s3[s3$type=="TN",]$n) 
 ```
