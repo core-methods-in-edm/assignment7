@@ -11,31 +11,73 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1<-read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+M1<-ggplot(D1, aes(y=pre.test.score)) + geom_histogram()
+M1
+M2<-ggplot(D1, aes(x=post.test.score)) + geom_histogram(colour="white")
+M3<-ggplot(D1, aes(x=pre.test.score)) + geom_histogram(colour="white")
+M4<-ggplot(D1, aes(x=messages)) + geom_histogram(colour="white")
+M5<-ggplot(D1, aes(x=forum.posts)) + geom_histogram(colour="white")
+M6<-ggplot(D1, aes(x=av.assignment.score)) + geom_histogram(colour="white")
+M7<-ggplot(D1, aes(x=level.up)) + geom_histogram(colour="white")
 
 #Then visualize the relationships between variables
+C1<-ggplot(D1, aes(x=pre.test.score, y=post.test.score)) + geom_point(shape=1)
+C1 + facet_grid(level.up ~ .)
+C2<-ggplot(D1, aes(x=id,y=pre.test.score)) + geom_point(shape=1)
+C2 + facet_grid(level.up ~ .)
+C3<-ggplot(D1, aes(x=id,y=post.test.score)) + geom_point(shape=1)
+C3 + facet_grid(level.up ~ .)
+C4<-ggplot(D1, aes(x=messages, y=post.test.score)) + geom_point(shape=1)
+C4+facet_grid(level.up ~ .) #interesting graph shows students who level up usually posted more messages
+C5<-ggplot(D1,aes(x=forum.posts, y=post.test.score)) + geom_point()
+C5+facet_grid(level.up ~ .) #doesn't show any obvious correlation between forum.posts and post.test.score
+C6<-ggplot(D1,aes(x=av.assignment.score, y=post.test.score)) + geom_point()
+C6+facet_grid(level.up ~ .) # shows that those students who leveled up usually scored higher on the assignments
 
 #Try to capture an intution about the data and the relationships
 
+#The students who posted > 90 messages usually leveled up. Then if a student had an average assignment score of > 0.25 then they usually leveled up. The students who scored > 0.5 on the pre.test.score usually leveled up as well. Forum.posts did not show an obvious pattern.
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+#The three variables I will use is pre.test.score, messages, and av.assignment.score.
+library(rpart)
+
+c.tree1 <- rpart(level.up ~ pre.test.score + messages + av.assignment.score , method="class", data=D1)
+
+printcp(c.tree1)
+
+post(c.tree1, file = "ass7_tree1.ps", title = "Online Geography Tutoring System")
+
+
 #Plot and generate a CP table for your tree 
+
+D1$predict1 <- predict(c.tree1, D1, type = "class")
+
+table(D1$level.up, D1$predict1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#Using the equation for Cohen's Kappa, p0 = (390+595)/ 1000 = .985, pe = (605/1000)*(600/1000)+(400/1000)*(395/1000) = 0.521, Kappa = (.985-.521)/(1-.521) = 0.9687
+
+#If this is right then I have a pretty good model! My Cohen Kappa is .9687 so the agreement between my model and the data is pretty good. Is it too good? Is it overfit? Ummm...
+
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
@@ -44,24 +86,40 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values")) #Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+#For this part I will use the post.test.score and forum.posts variables.
+c.tree2 <- rpart(level.up ~ post.test.score +forum.posts , method="class", data=D1)
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+pred2.detail <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred2.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred2.detail,"auc"), "y.values"))
+
+#My model using messages, av.assignment.score, and pre.test.score had a higher AUC than this model with post.test.score and forum.posts. Thus, my model was better.
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$threshold.pred1 <- 0.001 #just sort of arbitrarily chosen as a very close value to the upper left corner of the ROC curve and slightly lower than the AUC value
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+#accuracy = correct predictions/ total predictions
+D1$accuracy.model1 <- (390+595)/(1000)
 
-D1$precision.model1 <- 
+#Precision = TP/(TP+FP)
+D1$precision.model1 <- 390/(390+5)
 
-D1$recall.model1 <- 
+#Recall = TP/(TP+FN)
+D1$recall.model1 <- 390/(390+10)
 
 #Finally, calculate Kappa for your model according to:
 
@@ -75,6 +133,8 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+#I turned my threshold value all the way down to 0.01 and I was still getting a Kappa of "1". Is that first rise of my ROC, the one that is almost vertical, really that steep? I don't know why my threshold reading is off.
 
 ```
 
