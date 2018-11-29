@@ -1,6 +1,6 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
+author: "Megan Dansby Russell"
 date: "11/30/2016"
 output: html_document
 ---
@@ -9,64 +9,207 @@ In the following assignment you will be looking at data from an one level of an 
 
 ## Part I
 
+#LIBRARIES
+```{r}
+library(rpart)
+library(mvtnorm)
+library(multcomp)
+library("party")
+library("dplyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library("ggplot2", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library("igraph", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library("RColorBrewer", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library("tidyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library("tidyselect", lib.loc="/Library/Frameworks/R.framework/Versions/3.3/Resources/library")
+library(factoextra)
+library(reshape2)
+library(purrr)
+
+install.packages("corrplot")
+library(corrplot)
+
+install.packages("Hmisc")
+library("Hmisc")
+
+install.packages("ROCR")
+```
+
+
+
 #Upload data
 ```{r}
-
+D1 <- as.data.frame(read.csv("online.data.csv"))
+D2 <- D1
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+----------------------------------------------------------------------------------------------
+ # #ATTEMPT 1 - DO NOT USE
+ #  hp <- ggplot(D1, aes(x=post.test.score)) + geom_histogram(binwidth=2, colour="white")
+ #  
+ #  #HISTOGRAM OF "POST TEST SCORE", DIVIDED BY LEVEL UP
+ #  hp + facet_grid(D1$level.up)
+
+----------------------------------------------------------------------------------------------
+#ATTEMPT 2 - WORKING! :-)
+#REFERENCED FROM HERE: https://drsimonj.svbtle.com/quick-plot-of-all-variables
+  D2 %>%
+    keep(is.numeric) %>%
+    gather() %>%
+    head()
+  
+  D2 %>%
+    keep(is.numeric) %>%
+    gather() %>%
+    ggplot(aes(value)) +
+      facet_wrap(~ key, scales = "free") +
+      geom_histogram(bins=30)
+
 #Then visualize the relationships between variables
 
-#Try to capture an intution about the data and the relationships
+  #I WILL ATTEMPT TO VISUALIZE THESE RELATIONSHIPS USING A CORRELATION MATRIX
+  #REFERENCED FROM HERE: http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software
+  D3 <- data.matrix(D1)
+  res <- cor(D3)
+  round(res, 2)
+  
+  rcorr(D3, type=c("pearson", "spearman"))
+  res2 <- rcorr(as.matrix(D3))
+  res2
+  
+  corrplot(res, type = "upper", order = "hclust",
+           tl.col = "black", tl.srt = 45)
 
+#Try to capture an intution about the data and the relationships
+# It seems strange that all of the items are positively correlated with each other, and there are no negative   correlations (perhaps I did something wrong :-( ) However, assuming that this is correct, it seems that post-test score is most correlated with the amount of messages and the av assignment score, followed by the pre-test score. These three factors also are correlated with whether or not a student was able to move to the higher level.
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
-#Plot and generate a CP table for your tree 
+  #FIRST-PASS AT WHICH VARIABLES TO USE BASED UPON THE RESULTS FROM THE CORRELATION MATRIX
+    c.tree.levelUp <- rpart(level.up ~ post.test.score + av.assignment.score + messages, method="class", data=D1) 
 
-#Generate a probability value that represents the probability that a student levels up based your classification tree 
-
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+  #Check the results from the classifcation tree using the printcp() command
+  
+    printcp(c.tree.levelUp)
+  
+  #Plot and generate a CP table for your tree 
+  
+    post(c.tree.levelUp, file = "levelUpTree.ps", title = "Online Geography Tutoring") #This creates a pdf tree image
 ```
+
+
+```{r}
+#Probability
+    D4 <- D1
+    D4$predict <- predict(c.tree.levelUp, D4, type="class")
+    table(D4$level.up, D4$predict)
+    #ACCORDING TO THE OUTPUT OF THIS CHART, MY MODEL IS 100% ACCURATE
+    #HOWEVER, THIS SEEMS TOO GOOD TO BE TRUE! LET'S INVESTIGATE FURTHER
+```
+
+
+```{r}
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+  D5 <- D1
+  D5$pred <- predict(c.tree.levelUp, type = "prob")[,2]
+  #Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to   see the probability that our classififcation is based on.
+```
+
+<!-- __________________________________________________________________________________________________________ -->
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(D5$pred, D5$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+  #Unlist liberates the AUC value from the "performance" object created by ROCR
 
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
 ```
+
+
+
+```{r}
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+      c.tree2.levelUp <- rpart(level.up ~ pre.test.score + forum.posts + id, method="class", data=D1) 
+    
+      #Check the results from the classifcation tree using the printcp() command
+      
+        printcp(c.tree2.levelUp)
+      
+      #Plot and generate a CP table for your tree 
+      
+        post(c.tree2.levelUp, file = "levelUpTree2.ps", title = "Model 2: Online Geography Tutoring")
+    
+      #Probability
+        D6 <- D1
+        D6$predict <- predict(c.tree2.levelUp, D6, type="class")
+        table(D6$level.up, D6$predict)
+        #ACCORDING TO THE OUTPUT OF THIS CHART, MY MODEL IS 100% ACCURATE
+        #HOWEVER, THIS SEEMS TOO GOOD TO BE TRUE! LET'S INVESTIGATE FURTHER
+        
+    #Generate a probability value that represents the probability that a student levels up based your classification   
+        # tree 
+    D7 <- D1
+    D7$pred <- predict(c.tree2.levelUp, type = "prob")[,2]
+      #Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to   see the probability that our classififcation is based on.
+    
+    
+    #Plot the curve
+    pred.detail2 <- prediction(D7$pred, D7$level.up) 
+    plot(performance(pred.detail2, "tpr", "fpr"))
+    abline(0, 1, lty = 2)
+    
+    #Calculate the Area Under the Curve
+    unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+      #Unlist liberates the AUC value from the "performance" object created by ROCR
+
+```
+
+The plot from the second model depicts what we would classify as "reasonable separation." This means that we are reasonably modeling the sensitivity versus the specificity tradeoff in the second model
+
+###CONFIRM THAT I AM INTERPRETING THIS ^^^^^ CORRECTLY!###
+
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+  # MY FIRST MODEL LOOKED GOOD...I AM GUESSING 0.2 BASED ON THE INFLECTION POINT FROM THE SECOND GRAPH
+  # threshold.pred1 <- 0.2
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+  # #NOT SURE ABOUT WHAT THESE SHOULD BE...?
+  # 
+  #   SHOULD I BE FOLLOWING THE FORMAT BELOW?
+  #   # c.tree.accuracy <- rpart(accuracy.model1 ~ pre.test.score + forum.posts + id, method="class", data=D1)
+  #   # D7$pred <- predict(c.tree2.levelUp, type = "prob")[,2]
 
-D1$precision.model1 <- 
+D7$accuracy.model1 <- #IS THIS FOLLOWING THE predict()...FORMAT?
 
-D1$recall.model1 <- 
+D7$precision.model1 <- 
+
+D7$recall.model1 <- 
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(D7$level.up, D7$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
