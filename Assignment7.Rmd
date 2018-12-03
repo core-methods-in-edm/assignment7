@@ -6,33 +6,90 @@ output: html_document
 ---
 
 In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+Q: Is the benchmark 50 for the post test?
 
 ## Part I
 
 #Upload data
 ```{r}
-
+D1 <- read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
-#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+#STEP 1: Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
 
-#Then visualize the relationships between variables
+ggplot(D1,aes(x = pre.test.score)) + 
+  geom_histogram(color = "black",fill = "white") + 
+  facet_grid(level.up ~ .)
+#Pre-test score: "no" right-skewed, "yes" left-skewed
 
-#Try to capture an intution about the data and the relationships
+ggplot(D1,aes(x = post.test.score)) + 
+  geom_histogram(color = "black",fill = "white") + 
+  facet_grid(level.up ~ .)
+#Similar distribution as the pre-test scores for each group
+
+ggplot(D1,aes(x = messages)) + 
+  geom_histogram(color = "black",fill = "white") + 
+  facet_grid(level.up ~ .)
+#"no" students tend to send less messages than "yes" students
+
+ggplot(D1,aes(x = forum.posts)) + 
+  geom_histogram(color = "black",fill = "white") + 
+  facet_grid(level.up ~ .)
+#"no" students tend to post more forum posts than "yes" students
+
+ggplot(D1,aes(x = av.assignment.score)) + 
+  geom_histogram(color = "black",fill = "white") + 
+  facet_grid(level.up ~ .)
+#"yes" students achieve better avg assignment score than "no" students
+
+
+#STEP 2: Then visualize the relationships between variables
+library(corrplot)
+D2 <- D1[,-c(1,7)]
+COR <- cor(D2)
+
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+        tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+
+#STEP 3: Try to capture an intution about the data and the relationships
+#All variables are all align with the final outcomes, except for the forum posts. As we can see, "no" level up students tend to post more on the forum while "yes-level-up" post less on the forum. Also, according to the corrplot, it is ok if we drop the average assignment score.
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up ~ post.test.score + messages + pre.test.score, 
+                 method="class", data=D1)
 
 #Plot and generate a CP table for your tree 
+printcp(c.tree1)
+
+post(c.tree1, file = "tree1.ps", title = "Online Data Tree") #This creates a pdf image of the tree
+
+library(rpart.plot)
+plot(c.tree1)
+text(c.tree1)
+rpart.plot(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+D1$prediction <- predict(c.tree1, D1, type = "class")
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+table(D1$level.up, D1$prediction)
+
+#precision rate = 369/(128+369) = 74.25%
+#recall rate = 369/(369+472) = 43.88%
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
+
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
@@ -43,30 +100,59 @@ pred.detail <- prediction(D1$pred, D1$level.up)
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
+#What does the dash line represent???
+
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+#the auc = 0.8545833
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree2 <- rpart(level.up ~ forum.posts + av.assignment.score, 
+                 method="class", data=D1)
+
+D1$prediction2 <- predict(c.tree2, D1, type = "class")
+
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+#AUE = 0.976667
+
+#According to the corrplot, model 1 should give out a better prediction. However the AUE tells me that the second model is better...
+
 ```
+
+
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+#The knik point (0.2,0.9)
+D1$threshold.pred1 <- ifelse(D1$pred > 0.65, 1, 0)
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+diagnostictable <- table(D1$level.up,D1$threshold.pred1)
 
-D1$precision.model1 <- 
+diagnostictable
 
-D1$recall.model1 <- 
+D1$accuracy.model1 <- (472+369)/1000 #0.841
+
+D1$precision.model1 <- 369/(369+128) #0.7425
+
+D1$recall.model1 <- 369/(369+31) #0.9225
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
+
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -74,8 +160,21 @@ matrix1 <- as.matrix(table1)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+#Kappa1 = 0.9930247
 
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D1$threshold.pred2 <- ifelse(D1$pred2 > 0.93, 1, 0)
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+
+matrix2 <- as.matrix(table2)
+
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+#Kappa2 = 1.105136
+
+#Q:Based on Cohan's kappa formula, kappa value should not exceed 1...Doesn't make any sense...
+#If both are less than 1, I should choose the model that has higher kappa value. But not sure why model 
 ```
 
 
