@@ -1,0 +1,136 @@
+---
+title: "Assignment 7 - Answers"
+author: "Lena L"
+date: "12/02/2019"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+rawData<-read.csv("online.data.csv")
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+g1<- ggplot(data = rawData) +geom_histogram(aes(x = post.test.score)) + facet_wrap(~ level.up, )
+g2<- ggplot(data = rawData) +geom_histogram(aes(x = pre.test.score)) + facet_wrap(~ level.up)
+g3<- ggplot(data = rawData) +geom_histogram(aes(x = messages)) + facet_wrap(~ level.up)
+g4<- ggplot(data = rawData) +geom_histogram(aes(x = forum.posts)) + facet_wrap(~ level.up)
+g5<- ggplot(data = rawData) +geom_histogram(aes(x = av.assignment.score)) + facet_wrap(~ level.up)
+
+# put all visualizations in one graph
+install.packages("grid.extra")
+library(gridExtra)
+grid.arrange(g1, g2, g3,g4,g5, ncol=3)
+
+#Then visualize the relationships between variables
+pairs(level.up~post.test.score+pre.test.score+messages+forum.posts+av.assignment.score,data=rawData)
+library(corrplot)
+corrplot(cor(rawData[, 1:5], rawData[, 1:5]), method="circle")
+
+#Try to capture an intution about the data and the relationships
+#according to the graph, we should choose variables that can better classify between level.up and not-level.up; so we choose varialbes assignment score, post.test.score and messages
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+library(rpart)
+myFormula<-level.up~forum.posts+messages+av.assignment.score
+online_rpart <- rpart(myFormula, data=rawData, control = rpart.control(minsplit = 10))
+
+#Plot and generate a CP table for your tree 
+print(online_rpart$cptable)
+rpart.plot::rpart.plot(online_rpart)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+rawData$pred <- predict(online_rpart, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+
+#Plot the curve
+pred1 <- prediction(rawData$pred, rawData$level.up) 
+plot(performance(pred1, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred1,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+# we get the value 0.99525, which indicates that this model works pretty well
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+library(rpart)
+myFormula2<-level.up~post.test.score+pre.test.score
+online_rpart2 <- rpart(myFormula2, data=rawData, control = rpart.control(minsplit = 10))
+print(online_rpart2$cptable)
+rpart.plot::rpart.plot(online_rpart2)
+
+rawData$pred2 <- predict(online_rpart2, type = "prob")[,2]
+pred2 <- prediction(rawData$pred2, rawData$level.up) 
+plot(performance(pred2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred2,"auc"), "y.values"))
+
+# compared to the second one, which has a AUC value of 0.854, the former one, because the AUC value is closer to 1, which means that it has a high power of classification
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+D1<-rawData
+D1$threshold.pred1<-ifelse(D1$pred>=0.8,1,0)
+D1$level.up<-ifelse(D1$level.up=="yes",1,0)
+
+cm1<-table(D1[,7],D1[,10])
+
+#Now generate three diagnostics:
+
+D1$accuracy.model1 <-(595+390)/(595+5+10+390)
+#accuracy of model 1 is 0.985
+
+D1$precision.model1 <- 595/(595+10)
+#precision of model 1 is 0.9835
+
+D1$recall.model1 <- 595/(595+5)
+#recall of model 1 is 0.9917
+
+#Finally, calculate Kappa for your model according to:
+library(psych)
+cohen.kappa(cm1, w=NULL,n.obs=NULL,alpha=.05)
+
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D1$threshold2.pred1<-ifelse(D1$pred>=0.2,1,0)
+
+cm2<-table(D1[,7],D1[,14])
+
+#Now generate three diagnostics:
+
+D1$accuracy.model2 <-(572+400)/(572+400+0+28)
+#accuracy of model 1 is 0.972
+
+D1$precision.model1 <- 572/(572+0)
+#precision of model 1 is 1.0
+
+D1$recall.model1 <- 572/(572+28)
+#recall of this model is 0.953
+
+cohen.kappa(cm2, w=NULL,n.obs=NULL,alpha=.05)
+
+# kappa for the first threshold is larger and closer to 1 so the first threshold is better.
+
+```
+
+
