@@ -11,12 +11,14 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+D1 <- read.csv("~/Desktop/HUDK4050/assignment7/online.data.csv")
 
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
 
 #Then visualize the relationships between variables
 
