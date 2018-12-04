@@ -12,26 +12,45 @@ In the following assignment you will be looking at data from an one level of an 
 #Upload data
 ```{r}
 
+library(tidyr)
+library(dplyr)
+
+D1 = read.csv("online.data.csv") 
+D1 = mutate(D1, level.up=ifelse(level.up=="yes",1,0)) 
+D2 = D1 %>% gather("factors", "value", 2:7)
+D2 = D2[,-1]
+
+
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
-#Then visualize the relationships between variables
+ library(ggplot2)
+ ggplot(D5, aes(value))+
+   geom_histogram()+
+   facet_wrap(~factors, scale="free")
 
 #Try to capture an intution about the data and the relationships
-
+ 
 ```
+Seems that there has been an overall increase from pre to post test score. It seems that that the factor of messages has been quite active and through this we can infer that messaging is effective in test score. In comparison to the forum posts, it seems that there is less activity. 
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
 #Plot and generate a CP table for your tree 
 
+library(rpart)
+rp<- rpart(level.up~messages+forum.posts+post.test.score, data=D1[2:7])
+printcp(rp)
+
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(rp, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -44,7 +63,7 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
@@ -53,7 +72,7 @@ unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC valu
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$pred1 
 
 #Now generate three diagnostics:
 
