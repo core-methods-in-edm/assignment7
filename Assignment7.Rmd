@@ -18,7 +18,9 @@ D1 <- read.csv("~/Desktop/HUDK4050/assignment7/online.data.csv")
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+library(ggplot2)
+H1<-ggplot(D1, aes(y=pre.test.score)) + geom_histogram()
+H2<-ggplot(D1, aes(x=post.test.score)) + geom_histogram(colour="white")
 
 #Then visualize the relationships between variables
 
