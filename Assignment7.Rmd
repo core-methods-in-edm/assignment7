@@ -1,7 +1,7 @@
 ---
 title: "Assignment 7"
 author: "Meijuan Zeng"
-date: "11/30/2016"
+date: "11/30/2018"
 output: html_document
 ---
 
@@ -21,6 +21,17 @@ D1$level.up <- ifelse(D1$level.up == "yes", 1, 0)
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 library(tidyr)
 library(ggplot2)
+
+ggplot(D1, aes(post.test.score)) + geom_histogram()+facet_wrap(~level.up)
+
+ggplot(D1, aes(pre.test.score)) + geom_histogram()+facet_wrap(~level.up)
+
+ggplot(D1, aes(messages)) + geom_histogram()+facet_wrap(~level.up)
+
+ggplot(D1, aes(forum.posts)) + geom_histogram()+facet_wrap(~level.up)
+
+ggplot(D1, aes(av.assignment.score)) + geom_histogram()+facet_wrap(~level.up)
+
 D2 <- gather(D1, id, post.test.score, 2:7)
 names(D2) <- c("key", "value")
 ggplot(D2, aes(value)) + geom_histogram(bins = 30) + facet_wrap(~key, scale = 'free')
