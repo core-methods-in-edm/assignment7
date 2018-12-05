@@ -11,15 +11,25 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+df <- read.csv('online.data.csv')
+summary(df)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(purrr)
+library(tidyr)
+library(ggplot2)
 
+df %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
 #Then visualize the relationships between variables
-
+library(corrplot)
 #Try to capture an intution about the data and the relationships
 
 ```
