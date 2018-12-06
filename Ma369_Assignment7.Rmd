@@ -1,0 +1,218 @@
+---
+title: "Assignment 7 - Answers"
+author: "Marygracia"
+date: "04/12/2018"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+
+d1<-read.csv("online.data.csv", header = TRUE, sep = ",")
+
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+#laoding library
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+
+#becoming level.up numeric
+d2 = mutate(d1, level.up=ifelse(level.up=="yes",1,0)) 
+
+#gathering data by all variables except for id
+d3 = d2 %>% gather("variable", "value", 2:7)
+d3 = d3[,-1]
+
+#histogram
+ggplot(d3, aes(value))+
+   geom_histogram()+
+   facet_wrap(~variable, scale="free")
+
+#Then visualize the relationships between variables
+
+d4 <- d2[,2:7]
+corr_all <- cor(d4)
+corrplot(corr_all, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+
+#Try to capture an intution about the data and the relationships
+
+```
+**Messaging between students was more frequent than posting in the forum. This explains why all correlation coefficients of posting and the rest of variables in the forum were moderate or low and positive. While, correlation coefficients for messaging and the rest of variables (except for posting in the forum) were strong and positive. Not surprising, there is strong correlation between the decision that a student continues on to the next level (level up) and variables related to learning (average assignment score and post-test score). In addition, level up and prior knowledge (pre-test score) is positively and moderately correlated. This might be because  outcome variables (average assignment score and post-test score) are strongly and positively correlated with prior knowledge (pre-test score).**
+
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+#laoding library
+library(rpart)
+
+#creating decising tree
+rp<- rpart(level.up~messages+pre.test.score+forum.posts, method="class", data=d2) 
+
+#Plot and generate a CP table for your tree 
+
+#ploting
+post(rp, file = "tree1.ps", title = "Online Geography Tutoring System")
+
+#CP table
+printcp(rp)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+d2$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#Calculating error rate
+tree1.descision1<-round(39/211, digits = 2)*100
+tree1.descision2<-round(93/147, digits = 2)*100
+
+```
+
+**The decision trees pedicts that those students who have sent in average 104 or more messages the system will allow them to continue on to the next level with an error rate of 18%. Furthermore, the models predicts that students that in average have sent between 84 to 103 messages and obtained in average 0.425 in the pre-test will continue on to the next level with a rate error of 63%.**
+
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+
+#laoding library
+#install.packages("ROCR")
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(d2$pred, d2$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+area1<-unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+# priting the area under the curve
+area1 #0.8825125
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+#creating decising tree
+rp2<- rpart(level.up~av.assignment.score+av.assignment.score, method="class", data=d2) 
+
+#ploting
+post(rp2, file = "tree2.ps", title = "Online Geography Tutoring System")
+
+#CP table
+printcp(rp2)
+
+#Probability value that represents the probability that a student levels up based your classification tree 
+d2$pred2 <- predict(rp2, type = "prob")[,2]
+
+#Plot the curve
+pred.detail2 <- prediction(d2$pred2, d2$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+area2<-unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+# priting the area under the curve
+area2 #0.9766667
+
+#error rate
+tree2.decision1<-round(28/400, digits = 2)*100
+
+```
+
+**The second model is better for two reasons. First, it is better at predicting that the system will allow the student to go to the next level. The area under the curve for the second model is greater than in the first model. Secondly, the second model is simplier than the first model. It only has three nodes and the error rate of predicting that the system will allow the student to go to the next level is of 7%.**
+
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+#distribution of probability
+table(d2$pred)
+
+#setting treshold
+threshold.pred1 <- 0.8
+d2$threshold.pred1<-ifelse(d2$pred>=threshold.pred1,1,0)
+
+#Now generate three diagnostics:
+
+library(plyr)
+
+#creating categories
+d2.a <- count(d2, level.up, threshold.pred1)
+d2.a$outcome <- ifelse(d2.a$level.up== 1 & d2.a$threshold.pred1== 1, "TP", ifelse(d2.a$level.up== 1 & d2.a$threshold.pred1== 0, "FN", ifelse(d2.a$level.up== 0 & d2.a$threshold.pred1== 1, "FP", "TN")))
+
+#First diagnostics
+accuracy.model1 <- ((d2.a[d2.a$outcome=="TP",]$n + d2.a[d2.a$outcome=="TN",]$n) / sum(d2.a$n))
+#The accuracy of model 1 is 0.772
+
+#Second diagnostics
+precision.model1 <- d2.a[d2.a$outcome=="TP",]$n/(d2.a[d2.a$outcome=="TP",]$n+d2.a[d2.a$outcome=="FP",]$n)
+#The precision of model 1 is 0.844
+
+#Third diagnostics
+recall.model1 <- d2.a[d2.a$outcome=="TP",]$n/(d2.a[d2.a$outcome=="TP",]$n+d2.a[d2.a$outcome=="FN",]$n)
+#The recall of model 1 is 0.5275
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(d2$level.up, d2$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa1<-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#Kappa of model 1 is 1.040758
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+#setting treshold
+threshold.pred2 <- 0.6
+d2$threshold.pred2<-ifelse(d2$pred>=threshold.pred2,1,0)
+
+#Now generate three diagnostics:
+
+#creating categories
+d2.a <- count(d2, level.up, threshold.pred2)
+d2.a$outcome <- ifelse(d2.a$level.up== 1 & d2.a$threshold.pred2== 1, "TP", ifelse(d2.a$level.up== 1 & d2.a$threshold.pred2== 0, "FN", ifelse(d2.a$level.up== 0 & d2.a$threshold.pred2== 1, "FP", "TN")))
+
+#First diagnostics
+accuracy.model2 <- ((d2.a[d2.a$outcome=="TP",]$n + d2.a[d2.a$outcome=="TN",]$n) / sum(d2.a$n))
+#The accuracy of model 1 is 0.826
+
+#Second diagnostics
+precision.model2 <- d2.a[d2.a$outcome=="TP",]$n/(d2.a[d2.a$outcome=="TP",]$n+d2.a[d2.a$outcome=="FP",]$n)
+#The precision of model 1 is 0.7306
+
+#Third diagnostics
+recall.model2 <- d2.a[d2.a$outcome=="TP",]$n/(d2.a[d2.a$outcome=="TP",]$n+d2.a[d2.a$outcome=="FN",]$n)
+#The recall of model 1 is 0.895 
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(d2$level.up, d2$threshold.pred2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa2<-kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#Kappa of model 1 is 0.9944954
+
+```
+
+**After reducing the threshold, the accuracy and the recall increased and the precision and the kappa value decreased. This emphasizes the fact that in order to have more accuracy and recall, we should expect less precision and kappa value.**
