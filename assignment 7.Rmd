@@ -1,0 +1,104 @@
+---
+title: "Assignment 7"
+author: "Liping Yang"
+date: "12/09/2018"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+ #Upload data
+```{r}
+D1 <- read.csv("online.data.csv", header = TRUE)
+View(D1)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(rpart)
+```
+ #Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(GGally)
+ggplot(data, aes(x=post.test.score)) + geom_histogram() + facet_wrap(~level.up)
+ggplot(data, aes(x=pre.test.score)) + geom_histogram() + facet_wrap(~level.up)
+ggplot(data, aes(x=messages)) + geom_histogram() + facet_wrap(~level.up)
+ggplot(data, aes(x=forum.posts)) + geom_histogram() + facet_wrap(~level.up)
+ggplot(data, aes(x=av.assignment.score)) + geom_histogram() + facet_wrap(~level.up)
+ #Then visualize the relationships between variables
+ggpairs(D1[2:6])
+#Try to capture an intution about the data and the relationships
+```
+According to the figure, first we find that there are some differences between the distributions of every variables and it is related to level up. When it comes to the correlation coefficients, we find that there are positive correlation between the variables. Some of them even has a strong correlation.
+ #Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+rp <- rpart(level.up ~ pre.test.score+forum.posts+av.assignment.score, data=data, method='class')
+ #Plot and generate a CP table for your tree 
+printcp(rp)
+post(rp, file = "tree.ps", title = "online_data")
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+D1 <- data.frame(level.up = data$level.up)
+D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+We use pre.test.score, forum.posts and av.assignment.score as our input variable, since they have weak correlation and the model perfomrs well.
+ ## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+ #Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+ #Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+ #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+rp1 <- rpart(level.up~., method = 'class', data=data)
+printcp(rp1)
+D2 <- data.frame(level.up = data$level.up)
+D2$pred <- predict(rp1, type = "prob")[,2]
+pred.detail1 <- prediction(D2$pred, D2$level.up)
+plot(performance(pred.detail1, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+```
+We find that in our model 2, it's auc value equal to 1, which represents that model 2 fit the training data very well and makes no error. We can say model 2 is a better model according to the roc curve. But when it comes to overfitting, model 2 may not be the best model. We should use test data to test whether it will be the best model,
+ ## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+ threshold <- 0.9345794
+threshold.pred1 <- rep('no', nrow(D1))
+threshold.pred1[which(D1$pred>=threshold)] <- 'yes'
+ #First generate the table of comparisons
+D1$threshold.pred1 <- threshold.pred1
+table1 <- table(D1$level.up, D1$threshold.pred1)
+ #Convert to matrix
+matrix1 <- as.matrix(table1)
+ #Now generate three diagnostics:
+table1
+D1$accuracy.model1 <- (572+400)/nrow(D1)
+ D1$precision.model1 <- 572/(572+28)
+ D1$recall.model1 <- 572/(572+0)
+ #Finally, calculate Kappa for your model according to:
+ #Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+ #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+threshold.new <- 0.0
+threshold.pred2 <- rep('no', nrow(D1))
+threshold.pred2[which(D1$pred>=threshold.new)] <- 'yes'
+D1$threshold.pred2 <- threshold.pred2
+table2 <- table(D1$level.up, D1$threshold.pred2)
+matrix2 <- as.matrix(table2)
+table2
+D1$accuracy.model2 <- 600/nrow(D1)
+D1$precision.model2 <- 600/(600+0)
+D1$recall.model2 <- 600/(600+400)
+ kappa(matrix2, exact = TRUE)/kappa(matrix2)
+```
+From the three diagnostics, we can see that threshold 1 is better to predict level.up. And acutually if we look at the roc curve, we will also find that threshold 1 is the best threshold. It not only has high accuracy and precision but also has high recall value. Futher more, threshold 1 has a higher kappa value than threshold 2, which shows that threshold 1 is better.
