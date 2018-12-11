@@ -1,0 +1,118 @@
+---
+title: "Assignment 7"
+author: "DA"
+date: "November 27, 2018"
+output: html_document
+---
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+A <- read.csv("online.data.csv", header = TRUE)
+library(dplyr)
+#however two columns are not numeric, change it into numeric
+A$messages <- as.numeric(A$messages)
+A$forum.posts <- as.numeric(A$forum.posts)
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+utils::str(hist(A$post.test.score, col = "gray", labels = TRUE))
+utils::str(hist(A$pre.test.score, col = "gray", labels = TRUE))
+utils::str(hist(A$messages, col = "gray", labels = TRUE))
+utils::str(hist(A$forum.posts, col = "gray", labels = TRUE))
+utils::str(hist(A$av.assignment.score, col = "gray", labels = TRUE))
+library(ggplot2)
+
+#Then visualize the relationships between variables
+
+#Try to capture an intution about the data and the relationships
+
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(post.test.score~pre.test.score+forum.posts, method="class", data=A)
+
+#Plot and generate a CP table for your tree 
+printcp(c.tree1)
+post(c.tree1, file = "tree1.ps", title = "A")
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+A$pred <- predict(c.tree1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+#Plot the curve
+pred.detail <- prediction(A$pred, A$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+#abline is to add a line for prediction
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+#this model only predicts post test by 23 percent. 
+
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+#Calculation with new variables
+c.tree2 <- rpart(post.test.score~messages+av.assignment.score, method="class", data=A)
+
+#Plot and generate a CP table for your tree 
+printcp(c.tree2)
+post(c.tree2, file = "tree2.ps", title = "A2")
+A$pred1 <- predict(c.tree2, type = "prob")[,2]
+pred.detail1 <- prediction(A$pred1, A$level.up) 
+plot(performance(pred.detail1, "tpr", "fpr"))
+#abline is to add a line for prediction
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+#The second model perdicts it by 35 percent. The seonc model is the better model. 
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+A$threshold.pred1 <- ifelse(A$pred >= 0.8, "yes", "no")
+A$threshold.pred2 <- ifelse(A$pred >= 0.95, "yes", "no")
+A$threshold.pred3 <- ifelse(A$pred >= 0.25, "yes", "no")
+                             
+#Now generate three diagnostics:
+
+accuracy.model1 <- mean(ifelse(A$level.up == A$threshold.pred1, 1, 0))
+A$truepos.model1 <- ifelse(A$level.up == "yes" & A$threshold.pred1 == "yes", 1, 0)
+A$falsepos.model1 <- ifelse(A$level.up == "no" & A$threshold.pred1 == "yes", 1,0)
+A$falseneg.model1 <- ifelse(A$level.up == "yes" & A$threshold.pred1 == "no", 1,0)
+precision.model1 <- sum(A$truepos.model1)/(sum(A$truepos.model1) + sum(A$falsepos.model1))
+recall.model1 <- sum(A$truepos.model1)/(sum(A$truepos.model1) + sum(A$falseneg.model1)) 
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(A$level.up, A$threshold.pred1)
+table1
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+matrix1
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+```
+
+
