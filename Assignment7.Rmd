@@ -57,7 +57,7 @@ A2$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class"
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
-install.packages("ROCR")
+
 library(ROCR)
 
 #Plot the curve
@@ -122,4 +122,5 @@ A4.1 <- dplyr::count(A2, level.up, threshold.pred1)
  matrix2 <- as.matrix(table2)
  A5$kappa.model2 <- kappa(matrix2, exact = TRUE)/kappa(matrix2)
 
+```
 
