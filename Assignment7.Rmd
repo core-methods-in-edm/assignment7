@@ -1,7 +1,7 @@
 ---
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+title: "Assignment 7"
+author: "Sam Thanapornsangsuth"
+date: "11/27/2018"
 output: html_document
 ---
 
@@ -11,24 +11,48 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+M1 <- read.csv("online.data.csv", header = TRUE)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
-#Then visualize the relationships between variables
+library(ggplot2)
 
+P1<-ggplot(D1, aes(y=pre.test.score)) + geom_histogram ()
+P2<-ggplot(D1, aes(x=post.test.score)) + geom_histogram ()
+P3<-ggplot(D1, aes(x=pre.test.score)) + geom_histogram ()
+P4<-ggplot(D1, aes(x=messages)) + geom_histogram ()
+P5<-ggplot(D1, aes(x=forum.posts)) + geom_histogram ()
+P6<-ggplot(D1, aes(x=av.assignment.score)) + geom_histogram ()
+P7<-ggplot(D1, aes(x=level.up)) + geom_histogram ()
+#Then visualize the relationships between variables
+Q1<-ggplot(D1, aes(x=pre.test.score, y=post.test.score)) + geom_point(shape=1)
+Q1 + facet_grid(level.up ~ .)
+Q2<-ggplot(D1, aes(x=id,y=pre.test.score)) + geom_point(shape=1)
+Q2 + facet_grid(level.up ~ .)
+Q3<-ggplot(D1, aes(x=id,y=post.test.score)) + geom_point(shape=1)
+Q3 + facet_grid(level.up ~ .)
+Q4<-ggplot(D1, aes(x=messages, y=post.test.score)) + geom_point(shape=1)
+Q4+facet_grid(level.up ~ .)
+Q5<-ggplot(D1,aes(x=forum.posts, y=post.test.score)) + geom_point()
+Q6<-ggplot(D1,aes(x=av.assignment.score, y=post.test.score)) + geom_point()
+Q6+facet_grid(level.up ~ .)
 #Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up ~ pre.test.score + messages + av.assignment.score , method="class", data=M1)
+printcp(c.tree1)
+ post(c.tree1, file = "ass7_tree1.ps", title = "Online Geography Tutoring System")
 
 #Plot and generate a CP table for your tree 
-
+D1$predict1 <- predict(c.tree1, M1, type = "class")
+table(D1$level.up, D1$predict1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
