@@ -11,6 +11,18 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+# we don't need the id
+rm(list = ls())
+library(ggplot2)
+library(tidyr)
+library(corrplot)
+library(dplyr)
+library(tidyr)
+D1<-read.csv("online.data.csv")
+D2 <- select(D1, 1:7)
+#Convert yes/no to 1/0 to avoid mixing variable types
+D2$level.up <- ifelse(D2$level.up == "yes", 1,0)
+D3 <- gather(D2, "measure", "score", 2:7)
 
 ```
 
@@ -18,24 +30,39 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+p1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+p1 + geom_histogram(stat = "count")
+
 #Then visualize the relationships between variables
 
+pairs(D2)
+
+
 #Try to capture an intution about the data and the relationships
+
+# There are positive relationship between the avraibles. Messages, post.test.score, and av.assignment.score have the highest correlation with level.up.
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
 #Plot and generate a CP table for your tree 
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(c.tree1, type = "prob")[,2]
+
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+
 library(ROCR)
 
 #Plot the curve
@@ -44,38 +71,84 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+c.tree2 <- rpart(level.up ~ messages + av.assignment.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(c.tree2)
+plot(c.tree2)
+text(c.tree2)
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
 ```
+
+The second model is better.Because it has bigger area under the ROC curve.
+Thus more accurate to distinguishes wheather the students going to the next level and the students staying on the current level.
+
 ## Part III
-#Thresholds
-```{r}
+
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+```{r}
+#Thresholds
+D1$threshold.pred1 <- ifelse(D1$pred >= 0.8, "yes", "no")
+D1$threshold.pred2 <- ifelse(D1$pred >= 0.95, "yes", "no")
+D1$threshold.pred3 <- ifelse(D1$pred >= 0.25, "yes", "no")
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
+D1$truepos.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "yes", 1, 0)
+D1$falsepos.model1 <- ifelse(D1$level.up == "no" & D1$threshold.pred1 == "yes", 1,0)
+D1$falseneg.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "no", 1,0)
+precision.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falsepos.model1))
+recall.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falseneg.model1))
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
-
-#Finally, calculate Kappa for your model according to:
-
-#First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
+table1
 
-#Convert to matrix
+po <- (586+247)/(586+247+14+153)
+pe <- ((586 + 14)/(586+247+14+153))*((586 + 153)/(586+247+14+153)) + 
+  ((14 + 247)/(586+247+14+153))*((153+247)/(586+247+14+153))
 matrix1 <- as.matrix(table1)
-
-#Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa <- (po - pe)/(1 - pe)
+kappa
 
-#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+accuracy.model2 <- mean(ifelse(D1$level.up == D1$threshold.pred2, 1, 0))
+D1$truepos.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
+D1$falsepos.model2 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
+D1$falseneg.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "no", 1,0)
+precision.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falsepos.model2))
+recall.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falseneg.model2))
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+table2
+matrix2 <- as.matrix(table2)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+po2 <- (600+119)/(600+119+0+281)
+pe2 <- ((600 + 0)/(600+119+0+281))*((600 + 281)/(600+119+0+281))+
+  ((0 + 119)/(600+119+0+281))*((281+119)/(600+119+0+281))
+kappa2 <- (po2 - pe2)/(1 - pe2)
+kappa2
+
+library(psych) 
+cohen.kappa(table1)
+cohen.kappa(table2)
+
+accuracy.model1
+accuracy.model2
+
+precision.model1
+precision.model2
 
 ```
-
+The kappa values threshold=0.8 is better than threshold=0.95.
+The accuracy of model 1 is 83.3% and it is higher than the accuracy of model 2 = 71.9%
+However, the precision for model 1 is 94.6% while the precision for model 2 is 100%
 
