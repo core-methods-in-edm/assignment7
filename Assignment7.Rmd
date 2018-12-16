@@ -1,4 +1,4 @@
----
+;/[---
 title: "Assignment 7 - Answers"
 author: "Charles Lang"
 date: "11/30/2016"
@@ -9,9 +9,10 @@ In the following assignment you will be looking at data from an one level of an 
 
 ## Part I
 
-#Upload data
+#Upload data-
 ```{r}
-
+df <- read.csv('online.data.csv')
+summary(df)
 ```
 
 #Visualization 
@@ -21,7 +22,15 @@ In the following assignment you will be looking at data from an one level of an 
 #Then visualize the relationships between variables
 
 #Try to capture an intution about the data and the relationships
+library(purrr)
+library(tidyr)
+library(ggplot2)
 
+df %>%
+  keep(is.numeric) %>%
+  gather() %>%
+  ggplot(aes(value)) +
+    
 ```
 #Classification tree
 ```{r}
