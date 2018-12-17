@@ -9,7 +9,7 @@ In the following assignment you will be looking at data from an one level of an 
 
 ## Part I
 
-#Upload data-
+#Upload data--
 ```{r}
 df <- read.csv('online.data.csv')
 summary(df)
