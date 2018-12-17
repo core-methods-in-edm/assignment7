@@ -5,23 +5,32 @@ date: "11/30/2016"
 output: html_document
 ---
 
-In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+In the following assignment you will be looking at data from one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
 ## Part I
 
 #Upload data
 ```{r}
-
+library(readr)
+library(dplyr)
+library(tidyr)
+DF1 <- read_csv('online.data.csv')
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+#create dummy variable to show distribution of level up
+DF2 <- select(DF1, 1:7)
+DF2$level.up <- ifelse(DF1$level.up == "yes", 1,0)
+DF3 <- gather(DF2, "measure", "scores", 2:7)
 #Then visualize the relationships between variables
+library(ggplot2)
+p <- ggplot(data = DF3, aes(scores)) + geom_histogram(stat = "count")
+p + facet_wrap(~measure, scales = "free")
 
 #Try to capture an intution about the data and the relationships
-
+# assignment score, messages, post test and pre test are more or less normal distributions, while the forum post skews left. Also, level up is not even but there are enough instances of yes to use the data. 
 ```
 #Classification tree
 ```{r}
