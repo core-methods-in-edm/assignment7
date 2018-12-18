@@ -1,7 +1,7 @@
 ---
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+title: "Assignment 7"
+author: "Jiaying Li"
+date: "12/13/2018"
 output: html_document
 ---
 
@@ -11,31 +11,78 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+id <- seq(1,1000,1)
+D1 <- data.frame(id)
+
+post.test1 <- rnorm(500, 0.4,0.07)
+post.test1 <- ifelse(post.test1 < 0, 0, post.test1)
+post.test1 <- ifelse(post.test1 > 1, 1, post.test1)
+post.test2 <- rnorm(500, 0.6,0.07)
+post.test2 <- ifelse(post.test2 < 0, 0, post.test2)
+post.test2 <- ifelse(post.test2 > 1, 1, post.test2)
+
+D1$post.test.score <- round(c(post.test1,post.test2),2)
+
+D1$pre.test.score <- round(c(post.test1,post.test2), 2)
+
+D1$messages <- round(sample(c(150:200),1000, replace = TRUE)*D1$post.test.score)
+D1$forum.posts <- round(sample(c(0:40),1000, replace = TRUE)*(D1$post.test.score) + 2)
+D1$av.assignment.score <- round(D1$post.test.score*rnorm(1000, 0.5,0.1),2)
+D1$level.up <- ifelse(D1$post.test.score > 0.45 & D1$av.assignment.score > 0.25, "yes", "no")
+
 
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("tidyr")
+library(tidyr)
+install.packages("dplyr")
+library(dplyr)
+D2 <- select(D1, 1:7)
+D2$level.up <- ifelse(D2$level.up == "yes", 1,0)
+
+D3 <- gather(D2, "measure", "score", 2:7)
+
+p1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+p1 + geom_histogram(stat = "count")
 
 #Then visualize the relationships between variables
-
+pairs(D2)
 #Try to capture an intution about the data and the relationships
+
+
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+install.packages("rpart")
+library(rpart)
+install.packages("party")
+library(party)
+
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
+printcp(c.tree1)
+
+
 #Plot and generate a CP table for your tree 
+plot(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+D1$pred <- predict(c.tree1, type = "prob")[,2]
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
@@ -44,7 +91,7 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
@@ -53,15 +100,20 @@ unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC valu
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$threshold.pred1 <- ifelse(D1$pred >= 0.8, "yes", "no")
+
+D1$threshold.pred2 <- ifelse(D1$pred >= 0.95, "yes", "no")
+
+D1$threshold.pred3 <- ifelse(D1$pred >= 0.25, "yes", "no") 
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
 
-D1$precision.model1 <- 
+D1$precision.model1 <-  sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falsepos.model1))
 
-D1$recall.model1 <- 
+D1$recall.model1 <-  sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falseneg.model1))
+
 
 #Finally, calculate Kappa for your model according to:
 
@@ -76,6 +128,33 @@ kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+D1$threshold.pred1 <- ifelse(D1$pred >= 0.7, "yes", "no")
+
+D1$threshold.pred2 <- ifelse(D1$pred >= 0.85, "yes", "no")
+
+D1$threshold.pred3 <- ifelse(D1$pred >= 0.15, "yes", "no") 
+
+#Now generate three diagnostics:
+
+D1$accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
+
+D1$precision.model1 <-  sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falsepos.model1))
+
+D1$recall.model1 <-  sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falseneg.model1))
+
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+#The result does not alter a lot though the two thresholds are pretty different
 ```
 
 
