@@ -1,0 +1,127 @@
+---
+title: "Ian Douglas assignment 7"
+author: "ian douglas"
+date: "11/27/2018"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+D1 <- read.csv("online.data.csv")
+D2 <- subset(D1,select=-c(id))
+D2$level.up <- ifelse(D2$level.up == "no",0,1)
+D3 <- as.data.frame(scale(D2))
+D4 <- gather(D3,variable,value,1:6) 
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+hist1 = ggplot(D4,aes(x=value)) + geom_histogram(binwidth = 0.1) + facet_wrap(~variable, scales = "free")
+hist1
+cor1 <- cor(D2[,1:6])
+corrplot(cor1, order="AOE", method="circle", tl.pos="lt", type="upper", tl.col="black", tl.cex=0.6, tl.srt=45, addCoef.col="black", addCoefasPercent = TRUE, sig.level=0.50, insig = "blank")
+#Plot and generate a CP table for your tree 
+tree1 <- rpart(level.up ~ av.assignment.score + post.test.score + messages, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(tree1)
+plot(tree1)
+text(tree1)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+D2$pred <- predict(tree1, type = "prob")[,2]
+View(D2)
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+install.packages("ROCR")
+library(ROCR)
+
+#Plot the curve
+pred.curve <- prediction(D2$pred, D2$level.up) 
+plot(performance(pred.curve, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.curve,"auc"), "y.values")) #Unlist liberates the AUC value from the "performance" object created by ROCR
+#area under the curve is 1
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+#I think that that the first model was better because the false positive rate was zero, while all the predictions were accurate in comparison to the actual "level.up" data. The other model made some predictions with varying probabilities, some close to chance, and was much less accurate. The area under the curve shows this difference, which between the models is around .07 (in favor of the first model).
+tree2 <- rpart(D2$level.up ~ D2$pre.test.score + D2$forum.posts, method="class", control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(tree2)
+plot(tree2)
+text(tree2)
+D2$pred2 <- predict(tree2, type = "prob")[,2]
+pred.curve2 <- prediction(D2$pred2, D2$level.up) 
+plot(performance(pred.curve2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.curve2,"auc"), "y.values"))
+# Area under the curve is 0.9339042
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+D2$threshold.pred1 <- ifelse(D2$pred == 1, "yes", "no")
+D2$threshold.pred2 <- ifelse(D2$pred2 >= .90625, "yes", "no")
+
+#Now generate three diagnostics:
+
+D2$accuracy.model1 <- mean(ifelse(D2$level.up == D2$threshold.pred1, 1, 0))
+D2$accuracy.model2 <- mean(ifelse(D2$level.up == D2$threshold.pred2, 1, 0))
+
+D2$truepos.model1 <- ifelse(D1$level.up == "yes" & D2$threshold.pred1 == "yes", 1, 0)
+D2$falsepos.model1 <- ifelse(D1$level.up == "no" & D2$threshold.pred1 == "yes", 1,0)
+D2$falseneg.model1 <- ifelse(D1$level.up == "yes" & D2$threshold.pred1 == "no", 1,0)
+D2$truepos.model2 <- ifelse(D1$level.up == "yes" & D2$threshold.pred2 == "yes", 1, 0)
+D2$falsepos.model2 <- ifelse(D1$level.up == "no" & D2$threshold.pred2 == "yes", 1,0)
+D2$falseneg.model2 <- ifelse(D1$level.up == "yes" & D2$threshold.pred2 == "no", 1,0)
+
+precision.model1 <- sum(D2$truepos.model1)/(sum(D2$truepos.model1) + sum(D2$falsepos.model1))
+precision.model2 <- sum(D2$truepos.model2)/(sum(D2$truepos.model2) + sum(D2$falsepos.model2))
+
+recall.model1 <- sum(D2$truepos.model1)/(sum(D2$truepos.model1) + sum(D2$falseneg.model1))
+recall.model2 <- sum(D2$truepos.model2)/(sum(D2$truepos.model2) + sum(D2$falseneg.model2))
+
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(D2$level.up, D2$threshold.pred2)
+table2 <- table(D2$level.up, D2$threshold.pred2)
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa1 <- kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa2 <- kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D2$threshold.pred2.b <- ifelse(D2$pred2 > .91, "yes", "no")
+D2$accuracy.model2.b <- mean(ifelse(D2$level.up == D2$threshold.pred2.b, 1, 0))
+D2$truepos.model2.b <- ifelse(D2$level.up == "yes" & D2$threshold.pred2.b == "yes", 1, 0)
+D2$falsepos.model2.b <- ifelse(D2$level.up == "no" & D2$threshold.pred2.b == "yes", 1,0)
+D2$falseneg.model2.b <- ifelse(D2$level.up == "yes" & D2$threshold.pred2.b == "no", 1,0)
+precision.model2.b <- sum(D2$truepos.model2.b)/(sum(D2$truepos.model2.b) + sum(D2$falsepos.model2.b))
+
+recall.model2.b <- sum(D2$truepos.model2.b)/(sum(D2$truepos.model2.b) + sum(D2$falseneg.model2.b))
+table2.b <- table(D2$level.up, D2$threshold.pred2.b)
+
+matrix2.b <- as.matrix(table2.b)
+
+kappa2.b <- kappa(matrix2.b, exact = TRUE)/kappa(matrix2.b)
+kappa1
+kappa2
+kappa2.b
+```
+
