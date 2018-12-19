@@ -19,23 +19,29 @@ D1 <- read.csv("~/Desktop/HUDK4050/assignment7/online.data.csv")
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 library(ggplot2)
-H1<-ggplot(D1, aes(y=pre.test.score)) + geom_histogram()
-H2<-ggplot(D1, aes(x=post.test.score)) + geom_histogram(colour="white")
-
+library(dplyr)
+library(tidyr)
+D2 <- select(D1, 1:7)
 #Then visualize the relationships between variables
-
+D2$level.up <- ifelse(D2$level.up == "yes", 1,0)
+D3 <- gather(D2, "measure", "score", 2:7)
+F1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+F1 + geom_histogram(stat = "count")
 #Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
 #Plot and generate a CP table for your tree 
-
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
