@@ -1,0 +1,140 @@
+---
+title: "Assignment 7 - Answers"
+author: "Aidi Bian"
+date: "12/17/2018"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(corrplot)
+library(rpart)
+library(rpart.plot)
+
+D1<-read.csv("online.data.csv", header=TRUE, na.strings="")
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+D2<-gather(D1, key, value, 2:7, -id)
+
+ggplot(D2, aes(value))+
+  geom_histogram(stat="count", color="red", fill="blue")+
+  facet_wrap(~key, scales='free_x')+
+  scale_y_log10()
+
+#Then visualize the relationships between variables
+pairs(D1)
+
+D1_1<-select(D1, 2:6)
+COR1<-cor(D1_1)
+corrplot.mixed(COR1, order="AOE", lower = "number", upper = "circle", addCoef.col = "gray")
+
+#Try to capture an intution about the data and the relationships
+```
+From the visualization, we see that all variables seems to have a positive correlation with one another (except from "id" and "level.up"). Particularly, "post.test.score" and "messages", "av.assignment.score" and "post.test.score" have strong positive correlations (r > 0.7).
+
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+c.tree1 <- rpart(level.up ~ av.assignment.score + messages, method="class", data=D1)
+printcp(c.tree1)
+
+#Plot and generate a CP table for your tree 
+post(c.tree1, file = "dtree1.ps", title = "online")
+rpart.plot(c.tree1, type=3, box.palette = c("red", "green"), fallen.leaves = TRUE)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+D1$pred <- predict(c.tree1, D1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+# Model 2
+c.tree2<-rpart(level.up~pre.test.score+post.test.score+forum.posts, method="class",data=D1)
+printcp(c.tree2)
+post(c.tree2, file = "dtree2.ps", title = "online2")
+rpart.plot(c.tree2, type=3, box.palette = c("red", "green"), fallen.leaves = TRUE)
+D1$pred2 <- predict(c.tree2, D1, type="prob")[,2]
+
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2, "auc"), "y.values"))
+```
+from the ROC curve, we think that the first model is better. Also the auc value for model 1 is higher than model 2, which indicates that the first model is better.
+
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+threshold <- 0.95
+threshold.pred1 <- rep('no', nrow(D1))
+threshold.pred1[which(D1$pred>=threshold)] <- 'yes'
+
+D1$threshold.pred1 <- threshold.pred1
+t_1 <- table(D1$level.up, D1$threshold.pred1)
+
+matrix1 <- as.matrix(t_1)
+
+#Now generate three diagnostics:
+t_1
+D1$accuracy.model1 <- (595 + 390) / nrow(D1)
+
+D1$precision.model1 <- 390 / (390 + 5)
+
+D1$recall.model1 <- 390 / (390 + 10)
+
+#Finally, calculate Kappa
+
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+threshold2 <- 0.65
+threshold.pred2 <- rep('no', nrow(D1))
+threshold.pred2[which(D1$pred>=threshold2)] <- 'yes'
+
+D1$threshold.pred2 <- threshold.pred2
+t_2 <- table(D1$level.up, D1$threshold.pred2)
+
+matrix2 <- as.matrix(t_2)
+
+#Now generate three diagnostics:
+t_2
+D1$accuracy.model1 <- (595 + 390) / nrow(D1)
+
+D1$precision.model1 <- 390 / (390 + 5)
+
+D1$recall.model1 <- 390 / (390 + 10)
+
+#Finally, calculate Kappa
+
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+```
+It's suprising that the two models are exactly same (with thresheld of 0.95 and 0.65)
+
