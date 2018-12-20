@@ -128,7 +128,7 @@ D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class"
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
-install.packages('ROCR')
+# install.packages('ROCR')
 library(ROCR)
 
 #Plot the curve
@@ -165,21 +165,28 @@ unlist(slot(performance(pred.detail,"auc"), "y.values"))
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$threshold.pred1 <- ifelse(D1$pred >= 0.9, "yes", "no")
+
+D1$threshold.pred2 <- ifelse(D1$pred >= 0.2, "yes", "no")
+
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
 
-D1$precision.model1 <- 
+D1$truepos.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "yes", 1, 0)
+D1$falsepos.model1 <- ifelse(D1$level.up == "no" & D1$threshold.pred1 == "yes", 1,0)
+D1$falseneg.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "no", 1,0)
 
-D1$recall.model1 <- 
+precision.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falsepos.model1))
+
+recall.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falseneg.model1))
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
-
+table1
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
@@ -187,6 +194,28 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+
+accuracy.model2 <- mean(ifelse(D1$level.up == D1$threshold.pred2, 1, 0))
+
+D1$truepos.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
+D1$falsepos.model2 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
+D1$falseneg.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "no", 1,0)
+
+precision.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falsepos.model2))
+
+recall.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falseneg.model2))
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+
+matrix2 <- as.matrix(table2)
+
+table2
+
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+# When the threshold was changed form 0.9 to 0.2, the precision went down but the recall went up.
 
 ```
 
