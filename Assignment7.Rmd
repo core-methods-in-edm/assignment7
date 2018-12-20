@@ -11,31 +11,124 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+library(ggplot2)
+library(corrplot)
+D1 <- read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
+#My Trials
+
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
-#Then visualize the relationships between variables
+#Histograms of pre&post
+p1 <- ggplot(D1, aes(x=pre.test.score)) + geom_histogram(colour = "white")
+p2 <- ggplot(D1, aes(x=post.test.score)) + geom_histogram(colour = "white")
+p1
+p2
 
+p1 + facet_grid(level.up ~ .)
+p2 + facet_grid(level.up ~ .)
+
+#Then visualize the relationships between variables
+D1_1 <- D1
+D1_1$level.up <- as.numeric(D1_1$level.up)
+COR <- cor(D1_1)
+
+pdf(file = "corr_plot.pdf")
+
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+
+dev.off()
 #Try to capture an intution about the data and the relationships
 
 ```
+
+```{r}
+#Answers from Charles
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+#HINT: look up "facet" in the ggplot documentation
+D2 <- select(D1, 1:7)
+
+#Convert yes/no to 1/0 to avoid mixing variable types
+D2$level.up <- ifelse(D2$level.up == "yes", 1,0)
+
+#Convert colnames to values
+D3 <- gather(D2, "measure", "score", 2:7)
+
+#Appending a facet layer to a ggplot generates the same plot for different subsets of data
+#Add a facet_wrap() to compare subsets of measure
+p1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+p1 + geom_histogram(stat = "count")
+
+#Visualize the relationships between variables
+pairs(D2)
+```
+
 #Classification tree
 ```{r}
+# My trial
+
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+library(rpart.plot)
 
-#Plot and generate a CP table for your tree 
+#scale
+D2_1 <- D2
+D2_1[, c(4, 5, 6)] <- scale(D2[, c(4, 5, 6)])
 
-#Generate a probability value that represents the probability that a student levels up based your classification tree 
+# train and test
+nrow(D2_1)
+s <- sample(1000, 800)
+s
+train <- D2_1[s,]
+test <- D2_1[-s,]
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+# tree
+tree <- rpart(level.up ~ messages + forum.posts + av.assignment.score, train, method = "class")
+rpart.plot(tree)
+
+#predict (class)
+p <- predict(tree, test, type = "class")
+test$predict <- p
+table(test[ ,7], p)
+
+#predict (prob)
+p2 <- predict(tree, test, type = "prob")
+colnames(p2) <- c('no','yes')
+p2 <- as.data.frame(p2)
+p2$p <- ifelse(p2$yes > p2$no, 1, 0)
+test$predict2 <- p2$p
+
 ```
+
+```{r}
+# Answers from Charles
+
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (remember to set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+rpart.plot(c.tree1)
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1)
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our previous classififcation was based on.
+
+```
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+install.packages('ROCR')
 library(ROCR)
 
 #Plot the curve
@@ -44,9 +137,28 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. 
+
+c.tree2 <- rpart(level.up ~ messages + av.assignment.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+rpart.plot(c.tree2)
+printcp(c.tree2)
+plot(c.tree2)
+text(c.tree2)
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+#Plot the curve
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+
+# Which one do you think was the better model? Why?
+# The second model is better since its AUC (0.99) is higher than the first one (0.93), which means the second model has a relatively higher true positive and lower false positive rate than the first model.
 ```
 ## Part III
 #Thresholds
