@@ -1,0 +1,125 @@
+---
+title: "Assignment 7 - Answers"
+author: "Nicola Law"
+date: "11/30/2016"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+D1 <- read.csv(file.choose())
+```
+```{r}
+D1$level.up <- ifelse(D1$level.up == 'yes', 1, 0)
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+library(ggplot2)
+
+library(tidyr)
+dlong <- gather(D1,'vars', 'value', 2:7)
+D2 <- dlong[-1]
+D2$value <- as.numeric(D2$value)
+ggplot(D2,aes(value, ..density..)) + geom_histogram(binwidth = .1) + facet_wrap(~vars, scales = 'free')
+
+#Then visualize the relationships between variables
+
+cor(D1)
+pairs(D2)
+qplot(x = messages, y = pre.test.score, data = D1, main = "Pre-Test", margins = TRUE)
+qplot(x = messages, y = post.test.score, data = D1, main = "Post-Test", margins = TRUE)
+qplot(x = messages, y = av.assignment.score, data = D1, main = "Average Assignment", margins = TRUE)
+qplot(x = av.assignment.score, y = post.test.score, data = D1, main = "Average Assignment on Post Test", margins = TRUE)
+
+#Try to capture an intution about the data and the relationships
+
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+library(rpart)
+tree1 <- rpart(level.up ~ messages + forum.posts + pre.test.score, method ='class', control = rpart.control(minsplit =1, minbucket =1, cp =0.001), data = D1)
+
+#Plot and generate a CP table for your tree 
+
+printcp(tree1)
+post(tree1, file = "tree1.ps", title = "Level Up")
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(tree1, type = "prob")[,2]
+
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+pred.detail1 <- prediction(D1$pred1, D1$level.up) 
+plot(performance(pred.detail1, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+tree2 <- rpart(level.up ~ forum.posts + av.assignment.score + pre.test.score, method ='class', control = rpart.control(minsplit =1, minbucket =1, cp =0.001), data =D1 )
+printcp(tree2)
+post(tree2, file = "tree2.ps", title = "Level Up - Tree 2")
+D1$pred2 <- predict(tree2, type = "prob")[,2]
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2,"auc"), "y.values")) #0.997
+
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+threshold.pred1 <-   
+D1$threshold.pred1 <- ifelse(D1$pred > 0.1, 1, 0)
+
+#Now generate three diagnostics:
+  
+D1$accuracy.model1 <- (571+398)/(571+29+2+398) #0.969
+
+D1$precision.model1 <- 571/(571+2) #0.99
+
+D1$recall.model1 <- 571/(571+29) #0.9517
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1) # =1.103
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+```
+
+
