@@ -215,6 +215,8 @@ table2
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 kappa(matrix2, exact = TRUE)/kappa(matrix2)
 
+# Why the kappas are larger than 1??   Kappa is supposed to be no larger than 1.
+
 # When the threshold was changed form 0.9 to 0.2, the precision went down but the recall went up.
 
 ```
