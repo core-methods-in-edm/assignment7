@@ -11,27 +11,54 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+D1 <- read.csv("online.data.csv")
+View(D1)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+D2 <- select(D1, 1:7)
+#Convert yes/no to 1/0 to avoid mixing variable types
+D2$level.up <- ifelse(D2$level.up == "yes", 1,0)
+D3 <- gather(D2, "measure", "score", 2:7)
 
+p1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+p1 + geom_histogram(stat = "count")
+
+#Visualize the relationships between variables
+pairs(D2)
 #Then visualize the relationships between variables
+library(corrplot)
 
+CD2<- D2[,-1]
+COR <- cor(CD2)
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 #Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1,minbucket=1, cp=0.001))
+
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1)
 
 #Plot and generate a CP table for your tree 
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
