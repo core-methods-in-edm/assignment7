@@ -11,6 +11,16 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(rpart)
+library(ROCR)
+library(psych)
+library(irr)
+
+D1 <- read.csv("online.data.csv")
+
 
 ```
 
@@ -18,7 +28,16 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+D2 <- dplyr::select(D1, 1:7)
+#Convert yes/no to 1/0 to avoid mixing variable types
+D2$level.up <- ifelse(D2$level.up=="yes", 1,0)
+D3 <- gather(D2, "measure", "score", 2:7)
+
+#plot(D2)
+
 #Then visualize the relationships between variables
+p1 <- ggplot(D3, aes(score)) + facet_wrap(~measure, scales = "free")
+p1 + geom_histogram(stat = "count")
 
 #Try to capture an intution about the data and the relationships
 
@@ -29,9 +48,14 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Plot and generate a CP table for your tree 
 
+c.tree <- rpart(level.up ~ messages + forum.posts, method="class", data=D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1)
+
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(c.tree, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -44,7 +68,7 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
@@ -53,15 +77,17 @@ unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC valu
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+threshold.pred1 <- ifelse(D1$pred >= 0.4, "yes", "no")
+threshold.pred2 <- ifelse(D1$pred >= 1.3, "yes", "no")
+threshold.pred3 <- ifelse(D1$pred >= 0.9, "yes", "no")
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- ifelse(D1$pred >= 0.4, "yes", "no")
 
-D1$precision.model1 <- 
+D1$precision.model1 <- ifelse(D1$pred >= 1.3, "yes", "no")
 
-D1$recall.model1 <- 
+D1$recall.model1 <- ifelse(D1$pred >= 0.9, "yes", "no")
 
 #Finally, calculate Kappa for your model according to:
 
@@ -75,6 +101,22 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+threshold.pred1 <- ifelse(D1$pred >= 1, "yes", "no")
+
+#Now generate three diagnostics:
+
+D1$accuracy.model1 <- ifelse(D1$pred >= 0.5, "yes", "no")
+
+D1$precision.model1 <- ifelse(D1$pred >= 1.4, "yes", "no")
+
+D1$recall.model1 <- ifelse(D1$pred >= 0.1, "yes", "no")
+
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+matrix1 <- as.matrix(table1)
+
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 ```
 
