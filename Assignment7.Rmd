@@ -1,5 +1,5 @@
----
-title: "Assignment 7 - Answers"
+---ADIB
+title: "Assignment 7"
 author: "Charles Lang"
 date: "11/30/2016"
 output: html_document
@@ -12,39 +12,79 @@ In the following assignment you will be looking at data from an one level of an 
 #Upload data
 ```{r}
 
+install.packages("readr")
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("ggplot2")
+library(readr)
+library(dplyr)
+library(tidyr)
+
+
+DF1 <- read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
+
+
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+DF2 <- select(DF1, 1:7)
+DF2$level.up <- ifelse(DF1$level.up == "yes", 1,0)
+DF3 <- gather(DF2, "measure", "scores", 2:7)
 
 #Then visualize the relationships between variables
 
+library(ggplot2)
+v <-ggplot(data = DF3, aes(scores)) + geom_histogram(stat = "count")
+v + facet_wrap(~measure, scales = "free")
+
 #Try to capture an intution about the data and the relationships
+
+#mainly normal curves/distributions. level up is not even. 
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+library(rpart)
+
+c.tree1 <- rpart(level.up ~ av.assignment.score + post.test.score + messages, control = rpart.control(minsplit = 15 ,cp=0.001), method ="class", data = DF1)
+
 #Plot and generate a CP table for your tree 
+
+printcp(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+DF1$pred <- predict(c.tree1, type = "prob")[,2]
+
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+library(stats)
+install.packages("ROCR")
 library(ROCR)
+install.packages("gplots")
+library(gplots)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(DF1$pred, DF1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
+
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(Pred2,"auc"), "y.values"))
+
+#I can't get the above to work and am stuck - Taha
+
+
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
