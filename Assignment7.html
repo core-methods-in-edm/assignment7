@@ -428,8 +428,8 @@ printcp(ctree_geog_its)</code></pre>
 ## 
 ##        CP nsplit rel error xerror     xstd
 ## 1 0.54250      0    1.0000 1.0000 0.038730
-## 2 0.01125      1    0.4575 0.4675 0.030825
-## 3 0.01000      3    0.4350 0.4825 0.031200</code></pre>
+## 2 0.01125      1    0.4575 0.4575 0.030569
+## 3 0.01000      3    0.4350 0.4800 0.031138</code></pre>
 <pre class="r"><code>#Pruning since gain to CP at 3rd split is not that much more, with no decrease in xerror
 #ctree_geog_its &lt;- prune.rpart(ctree_geog_its, cp = 0.01125)
 #Not doing this after all since it kind of ruins the ROC exercise. With few splits there are few unique probabilities assigned for the cases, and hence few cutoffs probabilities
@@ -664,6 +664,12 @@ library(psych)</code></pre>
 ## weighted kappa    0.44     0.49  0.55
 ## 
 ##  Number of subjects = 1000</code></pre>
+<p>Conclusions that can be drawn:</p>
+<ol style="list-style-type: decimal">
+<li>The first threshold has a higher kappa, accuracy, and recall.</li>
+<li>The second threshold has a higher precision.</li>
+<li>The first threshold is likely the better one to use. It shows more agreement between model and data (kappa), has a higher accuracy and recall. Although it has a lower precision, the reduction in precision (driven mostly by a lower false positive rate) is not sufficient to justify the tradeoff to accuracy and recall (driven mostly by the decreased true positive rate/increased false negative rate, which is larger than the decrease in FPR). The overestimation of students who might not level up would be a strain on resources.</li>
+</ol>
 </div>
 <div id="to-submit-your-assignment" class="section level3">
 <h3>To Submit Your Assignment</h3>
