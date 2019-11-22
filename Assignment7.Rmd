@@ -1,82 +1,263 @@
 ---
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
-output: html_document
+title: "Assignment 7 - Response"
+author: "Timothy Lee"
+date: "11/21/2019"
+output:
+  html_notebook: default
+  html_document:
+  pdf_document:
 ---
 
-In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+In the following assignment you will be looking at data from one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
 ## Part I
 
-#Upload data
-```{r}
+```{r message  = FALSE}
+#It looks like I'll need a few of these guys
+library(tidyverse)
 
+#For Correlation matrix
+library(GGally)
+
+#Classification tree
+library(rpart)
 ```
 
-#Visualization 
+
+#### Upload data
+
 ```{r}
+geog_its_raw <- read.csv("online.data.csv")
+```
+
+#### Visualization 
+
+```{r message = FALSE}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+distribution_df <- geog_its_raw %>%
+                      select(-id) %>% mutate("messages" = as.numeric(messages),
+                                             "forum.posts" = as.numeric(forum.posts),
+                                             "level.up" = as.numeric(level.up)
+                                             ) %>% 
+                      gather(key = "key",
+                             value = "value")
+
+ggplot(distribution_df) + aes(x = value) + geom_histogram(bins = 15) + facet_wrap(~key, scales = "free")
 
 #Then visualize the relationships between variables
+ggpairs(select(geog_its_raw, -id))
 
 #Try to capture an intution about the data and the relationships
 
 ```
-#Classification tree
+Aside from forum posts and average assignment score, all the continuous variables appear roughly normally distributed. Average assigment score has a slight positive skew, while forum posts has a pronounced positive skew.
+
+All the variables are positively correlated with each other. THe lowest correlation is at .273 (forum posts and pre-test) and the strongest correlation is at .94 (messages and post-test).
+Most of the correlations between the variables are between 0.5 and 0.8, except the two listed above and the correlation between forum posts and average assignment score (0.306).
+
+Level up appears to be related to all the variables except forum posts in the same way. Those who leveled up tended to be higher on all the other variables, especially average assignment score, where almost all those who did not level up had scores below 0.25, while almost all who did level up had scores above 0.25. For forum posts, those who did not level up appeared to have made less forum posts, while those who leveled up displayed a more even distribution in forum posts.
+
+
+#### Classification tree
+
 ```{r}
-#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums) - what does this mean?
+ctree_geog_its <- rpart(level.up ~ pre.test.score + messages + forum.posts,
+                        data = geog_its_raw)
 
 #Plot and generate a CP table for your tree 
+printcp(ctree_geog_its)
+
+#Pruning since gain to CP at 3rd split is not that much more, with no decrease in xerror
+#ctree_geog_its <- prune.rpart(ctree_geog_its, cp = 0.01125)
+#Not doing this after all since it kind of ruins the ROC exercise. With few splits there are few unique probabilities assigned for the cases, and hence few cutoffs probabilities
+#to choose from
+
+#Plot
+post(ctree_geog_its, filename = "")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+geog_its_raw$pred <- predict(ctree_geog_its, type = "prob")[,2]
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#The predict() function with type = "prob" returns a named matrix - each column is the probablility of being assigned one of the labels. Here we only take the 2nd column, which is p(yes)
 ```
-## Part II
-#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
-```{r}
-library(ROCR)
 
-#Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
+
+## Part II
+
+Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+
+```{r}
+#install.packages("ROCR")
+library(ROCR)
+```
+
+#### Generating ROC curve
+
+```{r}
+#Create prediction object. prediction() transforms the input data of predictions and actual labels into a standardised form for ROCR:: functions
+pred.detail <- prediction(geog_its_raw$pred, geog_its_raw$level.up)
+
+#performance() calculates performance metrics from prediction objects. 
+#"tpr" - true positive rate
+#"fpr" - false positive rate
+#These are the axes for the ROC curve
+perf.detail <- (performance(pred.detail, "tpr", "fpr"))
+plot(perf.detail)
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve, which can be done using the performance() function
+#performance() returns a class, which has slots. slot() extracts the item in a slot, here a list from the slot @y.values. 
+#Classes and slots (referred to with @) work like lists, but have no indexes. See ?Classes for more info on slots and classes.
+#unlist() is used to get the elements in the list that was in the slot object - here the AUC value
+unlist(slot(performance(pred.detail, "auc"), "y.values"))
+
+```
+
+```{r}
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+#Create a classification tree that predicts whether a student "levels up" using different variables
+ctree_geog_its2 <- rpart(level.up ~ post.test.score + av.assignment.score,
+                        data = geog_its_raw)
+
+#Plot and generate a CP table for your tree 
+printcp(ctree_geog_its2)
+post(ctree_geog_its2, filename = "")
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+geog_its_raw$pred2 <- predict(ctree_geog_its2, type = "prob")[,2]
+
+#Create prediction object. prediction() transforms the input data of predictions and actual labels into a standardised form for ROCR:: functions
+pred.detail2 <- prediction(geog_its_raw$pred2, geog_its_raw$level.up)
+
+#performance() calculates performance metrics from prediction objects. 
+plot(performance(pred.detail2, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail2, "auc"), "y.values"))
 
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
+*The second model is superior. It has a perfect ROC curve, classification accuracy, and 10-fold CV error. This seems unrealistic for real life data, but is believable in this context. The ITS probably uses these same metrics to assess student mastery of content, and decide on whether the student should level up. Hence, any model including these two important determinants of levelling up should be highly accurate in predicting whether the ITS actually allowed the students to level up.*
+
+
 ## Part III
-#Thresholds
+#### Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+#Create a data frame - I think a table would be useful to make the choice
+pred_detail_df <- data.frame(pred.detail@cutoffs,
+                             pred.detail@tp,
+                             pred.detail@fp,
+                             pred.detail@tn,
+                             pred.detail@fn,
+                             perf.detail@y.values,
+                             perf.detail@x.values
+                             )
+colnames(pred_detail_df) <- c("Cutoffs", "TP", "FP", "TN", "FN", "TPR", "FPR")
 
-#Now generate three diagnostics:
+#Print the DF - can compare with plot above
+pred_detail_df
 
-D1$accuracy.model1 <-
+#Set treshold at 0.6125 - this gives a TPR of 0.895 and a FPR of 0.22
+#On the graph this is right where the second bend is, which I think is a maximising point.
+#This would be particularly true if we assume that detecting true positives (sucessfully predicting that a student leveled up, is more important than committing
+#false positives (predicting that a student will level up when they didn't).
+#This is the case here - a false positive is more punishing than a false negative (student leveled up, but model predicted failure; FNR is 1-TPR)
+#A false positive might deprive a student of support to level up, whereas a false negative is a happy surprise
+geog_its_raw$threshold.pred1 <- geog_its_raw$pred > 0.6124
 
-D1$precision.model1 <- 
+#Had to drop threshold because it seems $prob calculated earlier exceeded the float. See test below
+# > 0.6125 >= 0.6125
+# [1] TRUE
+# > geog_its_raw$pred[100]
+# [1] 0.6125
+#> geog_its_raw$pred[100] >= 0.6125
+# [1] FALSE
 
-D1$recall.model1 <- 
+#Now generate three diagnostics
+#Accuracy = (TP + TN)/Total
+accuracy.model1 <- (pred_detail_df$TP[[3]] + pred_detail_df$TN[[3]])/1000
+writeLines(c("Accuracy", accuracy.model1, ""))
+
+#Precision = TP/(TP + FP)
+precision.model1 <- pred_detail_df$TP[[3]]/(pred_detail_df$TP[[3]] + pred_detail_df$FP[[3]])
+writeLines(c("Precision", precision.model1, ""))
+
+#Recall = TP/(TP + FN)
+recall.model1 <- pred_detail_df$TP[[3]]/(pred_detail_df$TP[[3]] + pred_detail_df$FN[[3]])
+writeLines(c("Recall", recall.model1, ""))
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
+table1 <- table(geog_its_raw$level.up, geog_its_raw$threshold.pred1)
+table1
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
+```
+
+```{r}
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+geog_its_raw$threshold.pred2 <- geog_its_raw$pred > 0.8439
+
+#Now generate three diagnostics
+#Accuracy = (TP + TN)/Total
+accuracy.model2 <- (pred_detail_df$TP[[2]] + pred_detail_df$TN[[2]])/1000
+writeLines(c("Accuracy", accuracy.model2, ""))
+
+#Precision = TP/(TP + FP)
+precision.model2 <- pred_detail_df$TP[[2]]/(pred_detail_df$TP[[2]] + pred_detail_df$FP[[2]])
+writeLines(c("Precision", precision.model2, ""))
+
+#Recall = TP/(TP + FN)
+recall.model2 <- pred_detail_df$TP[[2]]/(pred_detail_df$TP[[2]] + pred_detail_df$FN[[2]])
+writeLines(c("Recall", recall.model2, ""))
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(geog_its_raw$level.up, geog_its_raw$threshold.pred2)
+table2
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
 
 ```
+```{r}
+#How did I arrive at a kappa of more than 1?
+#Time to do manual calculations
+#First model
+p01 <- (468 + 358)/1000
+pe1 <- (((468 + 132)/1000) * ((468 + 42)/1000)) + (((42 + 358)/1000) * ((132 + 358)/1000))
+manual_kappa1 <- (p01 - pe1)/(1 - pe1)
+writeLines(c("Cohen's Kappa for the first model = ", manual_kappa1))
+
+  
+#2nd model
+p02 <- (561 + 211)/1000
+pe2 <- (((561 + 39)/1000) * ((561 + 189)/1000)) + (((189 + 211)/1000) * ((39 + 211)/1000))
+manual_kappa2 <- (p02 - pe2)/(1 - pe2)
+writeLines(c("Cohen's Kappa for the second model = ", manual_kappa2))
+
+```
+
+```{r}
+#Testing with psych package
+library(psych)
+cohen.kappa(matrix1)
+cohen.kappa(matrix2)
+```
+
 
 ### To Submit Your Assignment
 
