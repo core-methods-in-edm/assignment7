@@ -1,7 +1,7 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+author: "Fernando Carnaúba"
+date: "11/26/2019"
 output: html_document
 ---
 
@@ -11,72 +11,207 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+library(ggcorrplot)
+library(rpart)
+library(party)
+library(rattle)
+library(RColorBrewer)
+
+rm(list=ls()) 
+df <- read.csv("~/R/HUDK/assignment7/online.data.csv")
 
 ```
 
 #Visualization 
 ```{r}
+
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+df <- mutate(df, quartile = ntile(messages,4))
+
+# Let's create histograms that show students whi "levelled up" separately from those who didn't
+h1 <- ggplot(df) +
+        geom_histogram(aes(x=pre.test.score, fill=level.up), 
+                   colour="grey50", alpha=0.5, position="identity")
+h2 <- ggplot(df) +
+        geom_histogram(aes(x=post.test.score, fill=level.up), 
+                   colour="grey50", alpha=0.5, position="identity")
+h3 <- ggplot(df) +
+        geom_histogram(aes(x=messages, fill=level.up), 
+                   colour="grey50", alpha=0.5, position="identity")
+h4 <- ggplot(df) +
+        geom_histogram(aes(x=forum.posts, fill=level.up), 
+                   colour="grey50", alpha=0.5, position="identity")
+h5 <- ggplot(df) +
+        geom_histogram(aes(x=av.assignment.score, fill=level.up), 
+                   colour="grey50", alpha=0.5, position="identity")
+grid.arrange(h1,h2,h3,h4,h5, nrow = 3)
+
+# Let's now create histograms for the diferent quartiles of forum posts, to see if "messaging more" sweeps away the predictive power of other variables (i.e. students are learning when they post!)   
+h6 <- h1 +  facet_wrap(~ quartile, nrow = 1)
+h7 <- h2 +  facet_wrap(~ quartile, nrow = 1)
+h8 <- h4 +  facet_wrap(~ quartile, nrow = 1)
+h9 <- h5 +  facet_wrap(~ quartile, nrow = 1)
+
+grid.arrange(h6,h7,h8,h9, nrow = 4, top = "Histograms by 'messages' quartile")
 
 #Then visualize the relationships between variables
+df2 <- mutate(df, level.up = ifelse(level.up == "yes",1,0))
+df2 <- select(df2,-quartile, -id)
+
+corr <- round(cor(df2), 1)
+ggcorrplot(corr, hc.order = TRUE, type = "lower",  lab = TRUE)
 
 #Try to capture an intution about the data and the relationships
 
 ```
+
+ANSWER:
+- Fist image. Looking into the first plot, it becomes clear that pre-test scores, post-test scores and messages are strong predictors of "levelling up", since the distribution of each variable is shifted to the left for the case of students who do not level up. Another interesting thing is that"av.assignment.score" almost perfeclty separates studetns who level up from those who dont't, at the .25 threshold. This might be a straightly mechanical relationship (i.e the game algorithm passes students with av.scoore > .25). 
+
+- Second image. We now want to investigate a the variable "massage", because this is a variable that instructors could try to "foster" among students - it is an "actionable" variable. We now reproduce the same histograms, but separately for each quartile of "messages". We can see that students with higher level of messaging have much lower counts for "not-levelling up" (lower count bars for the graphs on the right, which represent the fourth quartile). Also, the distribution of pre and post scores of those who fail becomes much more similar to that of students who pass. Se "messaging" seems to have a positive effect. In the case of av.scores, we keep seeing a strong threshold, which is probably the formal rule used by the game to level students up.
+
+- Third image. Looking at the correlations graph, levelling up is most strongly associated with av.assignemnt scores, confirming what we discussed above. Also, across the two "actionable" variables ("messages" and "forum.posts"), messaging is the one strongly associated with levelling up. 
+
+
 #Classification tree
 ```{r}
-#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums) [We will NOT use av.score since we have sufficiente evidence that this variable sets the actual threshold for levelling up (so it is basically the SAME variable - so there is no point in using it to predict. I've actually tested using it, and coupled with the post-test score it gives us a perfect prediction - although one that doesn't make sense )]. I chose to use "messages", "forum posts" and "pre-test" scores, which are variable which are available for instructors to consult either at the beginning (pre test) or during student use (messages and forum posts).  
+tree1 <- rpart(level.up ~ pre.test.score  + messages+forum.posts, method="class", data=df, minsplit = 0, minbucket = 1, cp = 0.01)
+
 
 #Plot and generate a CP table for your tree 
+fancyRpartPlot(tree1, caption = NULL)
+printcp(tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+df$pred <- predict(tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
 ```
+
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(df$pred, df$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+tree2 <- rpart(level.up ~ post.test.score  + av.assignment.score, method="class", data=df, minsplit = 0, minbucket = 1, cp = 0.01)
+fancyRpartPlot(tree2, caption = NULL)
+
+df$pred2 <- predict(tree2, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#Plot the curve (model 2)
+pred.detail2 <- prediction(df$pred2, df$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+
 ```
+ANSWER:
+As mentioned before, using av.assignment doesn't seem to make sense, because this variable is probably what is used by the system to level students up. Accordingly, the second model predicts "leveling up" perfectly (auc=1). So it is not a variable that is avaliable for instructors before the game decides whether students will level up. The same is true for post.test.score, since this variable is only available after students use the game - so there it cannot be used as a predictor. So, for me, the first model is the only one that makes sense from a conceptual point of view.   
+
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+#let1s try 50%
+
+threshold.pred1 <- ifelse(df$pred > 0.5, 1, 0)
+
+#Some useful parameters
+df$true.pos.model1 <- threshold.pred1*df2$level.up
+df$false.pos.model1 <- threshold.pred1*(1-df2$level.up)
+df$true.neg.model1 <- (1-threshold.pred1)*(1-df2$level.up)
+df$false.neg.model1 <- (1-threshold.pred1)*df2$level.up
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+# accuracy = %predicted correctly 
+df$accuracy.model1 <- mean(ifelse(threshold.pred1 == df2$level.up,1,0))
 
-D1$precision.model1 <- 
+# precision = true_pos/(true_pos + false_pos)
+df$precision.model1 <-sum(df$true.pos.model1)/(sum(df$true.pos.model1)+sum(df$false.pos.model1)) 
 
-D1$recall.model1 <- 
+# recall = true_pos/(true_pos + false_neg)
+df$recall.model1 <-sum(df$true.pos.model1)/(sum(df$true.pos.model1)+sum(df$false.neg.model1)) 
 
-#Finally, calculate Kappa for your model according to:
-
-#First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
-#Convert to matrix
-matrix1 <- as.matrix(table1)
-
-#Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#Calculate kappa (I'm calculating it directly from the definition)
+po1 = mean(ifelse(threshold.pred1 == df2$level.up,1,0))
+pe1 = mean(threshold.pred1)*mean(df2$level.up)
+kappa1 = (po1-pe1)/(1-pe1)
+kappa1
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+
+#let1s try a higher threshold: 75%
+
+threshold.pred2 <- ifelse(df$pred > 0.75, 1, 0)
+
+#Some useful parameters
+df$true.pos.model2 <- threshold.pred2*df2$level.up
+df$false.pos.model2 <- threshold.pred2*(1-df2$level.up)
+df$true.neg.model2 <- (1-threshold.pred2)*(1-df2$level.up)
+df$false.neg.model2 <- (1-threshold.pred2)*df2$level.up
+
+#Now generate three diagnostics:
+
+# accuracy = %predicted correctly 
+df$accuracy.model2 <- mean(ifelse(threshold.pred2 == df2$level.up,1,0))
+
+# precision = true_pos/(true_pos + false_pos)
+df$precision.model2 <-sum(df$true.pos.model2)/(sum(df$true.pos.model2)+sum(df$false.pos.model2)) 
+
+# recall = true_pos/(true_pos + false_neg)
+df$recall.model2 <-sum(df$true.pos.model2)/(sum(df$true.pos.model2)+sum(df$false.neg.model2)) 
+
+#Calculate kappa (I'm calculating it directly from the definition)
+po2 = mean(ifelse(threshold.pred2 == df2$level.up,1,0))
+pe2 = mean(threshold.pred2)*mean(df2$level.up)
+kappa2 = (po2-pe2)/(1-pe2)
+kappa2
+
+
+
 ```
+MODEL 1 - Threshold 50%
+Accuracy - .826
+Precision - .731
+Recall - .895
+Kappa - .783
+
+
+MODEL 2 - Threshold 75%
+Accuracy - .772
+Precision - .844
+Recall - .527
+Kappa - .743
+
+Choosing a higher threshold leads to the following implications:
+- less true posives 
+- less false positives
+- more true negatives
+- more false negatives
+
+Using 50% in our first model as a baseline, as we increse the threshold, we reduce accuracy, because we are departing from the 50% threshold that maximizes our "correct guesses". Also, we increased precision and reduced accuraccy and the kappa.  
 
 ### To Submit Your Assignment
 
