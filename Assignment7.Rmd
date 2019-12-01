@@ -32,8 +32,8 @@ pairs(D1)
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 library(rpart)
-rp <- rpart(level.up ~ post.test.score + forum.posts + pre.test.score + av.assignment.score + messages, method = "class", data = D1)
-rp <- rpart(level.up ~ post.test.score + av.assignment.score, method = "class", data = D1)
+rp <- rpart(level.up ~ post.test.score + forum.posts + pre.test.score + av.assignment.score + messages, method = "class", data = D1,control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+rp <- rpart(level.up ~ post.test.score + av.assignment.score, method = "class", data = D1,control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
 #Plot and generate a CP table for your tree 
 printcp(rp)
 post(rp, file = "tree.ps", title = "levels up")
@@ -67,7 +67,7 @@ unlist(slot(performance(pred.detail2,"auc"), "y.values"))
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-D1$threshold.pred1 <- ifelse(D1$pred >= 0.8, "yes", "no")
+D1$threshold.pred1 <- ifelse(D1$pred2 >= 0.6, "yes", "no")
 
 #Now generate three diagnostics:
 accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
@@ -89,7 +89,7 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-D1$threshold.pred2 <- ifelse(D1$pred >= 0.95, "yes", "no")
+D1$threshold.pred2 <- ifelse(D1$pred2 >= 0.25, "yes", "no")
 accuracy.model2 <- mean(ifelse(D1$level.up == D1$threshold.pred2, 1, 0))
 D1$truepos.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
 D1$falsepos.model2 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
