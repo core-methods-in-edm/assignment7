@@ -11,16 +11,26 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1 <- read.csv("online.data.csv", header = TRUE)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+D2 <- D1
+D2$level.up <- ifelse(D2$level.up == "yes", 1, 0)
+D3 <- gather(D2, "var", "score", 2:7)
 
 #Then visualize the relationships between variables
+p <- ggplot(D3, aes(score)) +
+    facet_wrap(~ var, scales = "free")
+p + geom_histogram()
 
 #Try to capture an intution about the data and the relationships
+pairs(D2)
 
 ```
 #Classification tree
@@ -28,43 +38,84 @@ In the following assignment you will be looking at data from an one level of an 
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
 #Plot and generate a CP table for your tree 
+library(rpart)
+library(party)
+D4 <- select(D2, 2:6)
+D4 <- scale(D4, center = TRUE)
+D4 <- na.omit(D4)
+D4 <- as.data.frame(D4)
+pca <- prcomp(D4, center = TRUE)
+D5 <- as.data.frame(pca$rotation)
+loading <- abs(pca$rotation)
+c.tree <- rpart(level.up ~ post.test.score + messages + av.assignment.score, method = "class", data = D1)
+t <- c.tree$cptable
+c.tree <- prune(c.tree, cp = 0.01)
+post(c.tree, file = "tree.ps", title = "online")
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(c.tree, type = "prob")[,2]
+
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
 ```
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+##install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
-abline(0, 1, lty = 2)
+pred.detail <- prediction(D1$pred, D1$level.up)
+plot(performance(pred.detail, "tpr", "fpr")) +
+    abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree1 <- rpart(level.up ~ pre.test.score + forum.posts, method = "class", data = D1)
+t1 <- c.tree1$cptable
+c.tree1 <- prune(c.tree1, cp = 0.01)
+post(c.tree1, file = "tree1.ps", title = "online")
+D1$pred1 <- predict(c.tree1, type = "prob")[,2]
+pred.detail1 <- prediction(D1$pred1, D1$level.up)
+plot(performance(pred.detail1, "tpr", "fpr")) +
+    abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+
+##A: If I am looking for accuracy, I would like to think the first one is better than the second one. The first one is clearer than the later one. In other words, it is easy to read and understand. In the first model, 0 represents no, whereas 1 represents yes. However, in the second model, 0.7109974, for example, could be either yes or no. However, as Professor mentioned in class, accuracy is not always a good thing. It gives a little space to make mistakes. Based on this, I prefer the second one. 
+
 ```
 ## Part III
 #Thresholds
-```{r}
-#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+
+
+```{r}
+##Because my first model has a very high accuracy, I use the second one in this part instead of the first model.
+
+D1$threshold.pred1 <- ifelse(D1$pred1 >= 0.43, "yes", "no") 
+D1$threshold.pred2 <- ifelse(D1$pred1 >= 0.64, "yes", "no")
+D1$threshold.pred3 <- ifelse(D1$pred1 >= 0.70, "yes", "no") 
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- mean(ifelse(D1$level.up == D1$threshold.pred1, 1, 0))
 
-D1$precision.model1 <- 
+tpos <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "yes", 1, 0)
+fpos <- ifelse(D1$level.up == "no" & D1$threshold.pred1 == "yes", 1,0)
+fneg <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "no", 1,0)
 
-D1$recall.model1 <- 
+D1$precision.model1 <- sum(tpos)/(sum(tpos) + sum(fpos))
 
+D1$recall.model1 <- sum(tpos)/(sum(tpos) + sum(fneg))
+    
 #Finally, calculate Kappa for your model according to:
-
 #First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
 
@@ -74,7 +125,25 @@ matrix1 <- as.matrix(table1)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
+install.packages("psych")
+library(psych)
+cohen.kappa(table1)
+
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D1$accuracy.model2 <- mean(ifelse(D1$level.up == D1$threshold.pred2, 1, 0))
+
+tpos1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
+fpos1 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
+fneg1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "no", 1,0)
+
+D1$precision.model2 <- sum(tpos1)/(sum(tpos1) + sum(fpos1))
+
+D1$recall.model2 <- sum(tpos1)/(sum(tpos1) + sum(fneg1))
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+cohen.kappa(table2)
+
+## A：The second model with a little higher value of kappa but not obvious (i.e., unweighted kappa of the pred.model2 are 0.5, 0.56, and 0.61; unweighted kappa of the pred.model1 are 0.5, 0.55, and 0.6). Personally, both of them could be used as a predictional model. The pred.model2 is slightly better than the pred.model1 due to the bigger value of unweighted kappa. Otherwise, I should change the value of the probability threshold rather than 0.60.
 
 ```
 
