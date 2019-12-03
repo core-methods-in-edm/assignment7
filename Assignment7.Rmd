@@ -11,27 +11,42 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(GGally)
+library(rpart)
+D1 <- read.csv("~/Desktop/master fall/assignment7/online.data.csv")
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+hist(D1$pre.test.score)
+hist(D1$post.test.score)
+hist(D1$messages)
+hist(D1$forum.posts)
+hist(D1$av.assignment.score)
 
 #Then visualize the relationships between variables
-
+D1Sup <-D1[,c("pre.test.score","post.test.score")]
+ggpairs(select(D1,-id))
 #Try to capture an intution about the data and the relationships
+#all variables are positively correlated with each other.the highest correlation is  .94 between messages and post.test.score. the lowest correlation is .273 between post.test.score and forum.posts. most correlation falls in region .5 to .8.    
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+rp <- rpart(level.up ~ pre.test.score + messages + forum.posts, data = D1)
 #Plot and generate a CP table for your tree 
-
+printcp(rp)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+#plot
+post(rp,filename = "level.up relation")
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -44,40 +59,60 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+rp2 <- rpart(level.up ~ av.assignment.score+ post.test.score , data = D1)
+printcp(rp2)
+D1$pred2 <- predict(rp2, type = "prob")[,2]
+post(rp2,filename = "level.up relation 2")
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
 ```
+model 2 is better. it shows a perfect ROC curve, classification accuracy and 10-fold cv error.    
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
-
+threshold.pred1 <- data.frame(pred.detail@cutoffs,pred.detail@fp,pred.detail@tp,pred.detail@tn,pred.detail@fn)
+colnames(threshold.pred1)<- c("cutoffs","fp","tp","tn","fn")
+D1$threshold.pred1 <- D1$pred>0.8439
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- (threshold.pred1$tp[[3]]+threshold.pred1$tn[[3]])/1000
 
-D1$precision.model1 <- 
+D1$precision.model1 <- threshold.pred1$tp[[3]]/(threshold.pred1$tp[[3]]+threshold.pred1$fp[[3]])
 
-D1$recall.model1 <- 
+D1$recall.model1 <- threshold.pred1$tp[[3]]/(threshold.pred1$tp[[3]]+threshold.pred1$fn[[3]])
+
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
 table1 <- table(D1$level.up, D1$threshold.pred1)
-
+table1
 #Convert to matrix
 matrix1 <- as.matrix(table1)
-
+matrix1
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
-```
+D1$threshold.pred2 <- D1$pred>0.6124
 
+table2 <- table(D1$level.up, D1$threshold.pred2)
+table2
+
+matrix2 <- as.matrix(table2)
+matrix2
+
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+```
+second thereshold has lower kappa.
 ### To Submit Your Assignment
 
 Please submit your assignment by first "knitting" your RMarkdown document into an html file and then commit, push and pull request both the RMarkdown file and the html file.
