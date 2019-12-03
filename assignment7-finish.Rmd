@@ -1,0 +1,124 @@
+---
+title: "Assignment7"
+author: "yixiao"
+date: "2019/12/2"
+output: html_document
+---
+
+## Part I
+
+#Upload data
+```{r}
+data <- read.csv("online.data.csv")
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+# load the library for plot
+# install.packages("ggplot2")
+library(ggplot2)
+library(reshape2)
+hdata <- melt(data[,1:6] ,  id.vars = 'id', variable.name = 'score')
+ggplot(hdata, aes(value)) + geom_histogram(color="darkblue", fill="lightblue") + facet_grid(score ~ .)
+
+#Then visualize the relationships between variables
+
+pairs(~post.test.score+pre.test.score+messages+forum.posts+av.assignment.score+level.up,data=data, 
+   main="Scatterplot Matrix")
+
+#Try to capture an intution about the data and the relationships
+
+# Intuition: based on the plots, av.assignment.score could be a good indicator for predicting level.up
+
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+# install.packages("rpart")
+library(rpart)
+# rp <- rpart(level.up ~ post.test.score + messages + av.assignment.score, data = data, method="class")
+rp <- rpart(level.up ~ post.test.score + messages, data = data, method="class")
+
+#Plot and generate a CP table for your tree 
+
+printcp(rp)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+data$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(data$pred, data$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+
+```
+
+```{r}
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+rp2 <- rpart(level.up ~ pre.test.score + forum.posts, data = data, method="class")
+printcp(rp2)
+data$pred2 <- predict(rp2, type = "prob")[,2]
+#Plot the curve
+pred2.detail <- prediction(data$pred2, data$level.up) 
+plot(performance(pred2.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred2.detail,"auc"), "y.values"))
+
+# model rp is better than model rp2, because the auc value of rp is higher
+```
+
+
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+threshold.pred1 <- 0.1
+
+#Now generate three diagnostics:
+
+prob <- as.data.frame(predict(rp, newdata = data, type = "p"))
+res <- ifelse(prob$yes < threshold.pred1, "yes", "no")
+cm = as.matrix(table(Label = data$level.up, Predicted = res))
+
+data$accuracy.model1 <- sum(diag(cm))/sum(cm)
+
+data$precision.model1 <- cm[2,2]/sum(cm[2,])
+
+data$recall.model1 <- cm[2,2]/sum(cm[,2])
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+
+
+#Convert to matrix
+
+
+#Calculate kappa
+
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+```
+
+### To Submit Your Assignment
+
+Please submit your assignment by first "knitting" your RMarkdown document into an html file and then commit, push and pull request both the RMarkdown file and the html file.
+
