@@ -1,0 +1,199 @@
+---
+title: "Assignment 7 - Answers"
+author: "Charles Lang"
+date: "11/30/2016"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+Part1_data1 <- read.csv("online.data.csv")
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(tidyverse)
+?Facet
+
+Part1_data1[,-1] %>% keep(is.numeric) %>% gather() %>%  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
+
+
+#Then visualize the relationships between variables
+# install.packages("GGally")
+library(GGally)
+Part1_data2 <- Part1_data1[,-1]
+ggpairs(Part1_data2)
+
+#Try to capture an intution about the data and the relationships
+### Comments: 
+# From the histogram: The frequency of students' activeness on messaging is higher than posting questions on a forum regarding the assignment. There also exists a similar shape of distribution between the post test score and the number of messages sent by each student to other students about the assignments.
+# From the relationship visualization: The correlation coeeficient bewteen the post test score and the number of messages sent by each student to other students about the assignments is 0.94, which demonstrates a high positive relationship. The correlation coeeficient bewteen the post test score and the number of forum posts students posted asking questions about the assignment is 0.391, much less than the one between post score and messages. Thus, it is safe to guess that encouraging students to exchange messages about the assignments can be more helpful to improve satudents' grades on geography than posting forum posts. 
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+Part1_c.tree1 <- rpart(as.factor(level.up) ~ post.test.score + messages, method="class", data=Part1_data2)
+
+
+#Plot and generate a CP table for your tree 
+
+post(Part1_c.tree1, file = "Part1_tree1.ps", title = "MOOC")
+
+printcp(Part1_c.tree1)
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+
+Part1_data2$pred <- predict(Part1_c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(Part1_data2$pred, Part1_data2$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+Part1_c.tree2 <- rpart(as.factor(level.up) ~ forum.posts + av.assignment.score + pre.test.score, method="class", data = Part1_data2)
+
+printcp(Part1_c.tree2)
+
+#Plot and generate a CP table for your tree 
+
+post(Part1_c.tree2, file = "Part1_tree2.ps", title = "MOOC2") #This creates a pdf image of the tree
+
+Part1_data2$pred2 <- predict(Part1_c.tree2, type = "prob")[,2]
+
+#Plot the curve
+
+pred2.detail <- prediction(Part1_data2$pred2, Part1_data2$level.up) 
+
+plot(performance(pred2.detail, "tpr", "fpr"))
+
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred2.detail,"auc"),"y.values"))
+
+### Comments: The "AUC" value for the model 1 is 0.8545833, while the "AUC" value for the second is  0.9766667. This indicates that model 2 which uses "av.assignment.score" as the only variable is more accurate than the first model which uses "post.test.score" as the only variable. Whether studetns are allowed to go to the next level can be more accurately predicted from hi or her average assignment score.
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+
+# Choose the first threshold as 0.6
+
+# Calculate total true:
+threshold.pred1 <- ifelse(Part1_data2$pred >= 0.8, 1, 0)
+
+# Calculate total positive:
+level.up.positive <- ifelse(Part1_data2$level.up == "yes", 1, 0)
+
+# Calculate total false:
+threshold.pred0 <- 1000 - sum(threshold.pred1)
+
+# Calculate total negative:
+level.up.negative <- 1000 - sum(level.up.positive)
+
+# Calculate true positive:
+true.positive <- sum(threshold.pred1)/sum(level.up.positive)
+
+# Calculate true negative:
+true.negative <- threshold.pred0/level.up.negative
+
+# Calculate false positive:
+false.positive<- threshold.pred0/sum(level.up.positive)
+
+# Calculate false negative:
+false.negative<- sum(level.up.positive)/level.up.negative
+
+#Now generate three diagnostics:
+
+# Calculate correct predictions over the total number of predictions:
+Part1_data2$accuracy.model1 <- (true.positive + true.negative) / nrow(Part1_data2)
+unique(Part1_data2$accuracy.model1)
+
+Part1_data2$precision.model1 <- true.positive / (true.positive + false.positive)
+unique(Part1_data2$precision.model1)
+
+Part1_data2$recall.model1 <- true.positive / (true.positive + false.negative)
+unique(Part1_data2$recall.model1)
+
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(level.up.positive,threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+### Choose a threshold of 0.5
+
+threshold.pred1_2 <- ifelse(Part1_data2$pred >= 0.5, 1, 0)
+
+level.up.positive_2 <- ifelse(Part1_data2$level.up == "yes", 1, 0)
+
+threshold.pred0_2 <- 1000 - sum(threshold.pred1_2)
+
+level.up.negative_2 <- 1000 - sum(level.up.positive_2)
+
+true.positive_2 <- sum(threshold.pred1_2) / sum(level.up.positive_2)
+
+true.negative_2 <- threshold.pred0_2 / level.up.negative_2
+
+false.positive_2 <- threshold.pred0_2 / sum(level.up.positive_2)
+
+false.negative_2 <- sum(level.up.positive_2)/level.up.negative_2
+
+# Generate three diagnostics:
+
+Part1_data2$accuracy.model2 <- (true.positive_2 + true.negative_2) / nrow(Part1_data2)
+unique(Part1_data2$accuracy.model2)
+
+Part1_data2$precision.model2 <- true.positive_2 / (true.positive_2 + false.positive_2)
+unique(Part1_data2$precision.model2)
+
+Part1_data2$recall.model2 <- true.positive_2 / (true.positive_2 + false.negative_2)
+unique(Part1_data2$recall.model2)
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table2 <- table(level.up.positive_2,threshold.pred1_2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+### Comments: The first threshhold was set to >=80% and the second to >=50%. Accuracy, precision and recall increase from threshold one to threshold two. However, the Kappa has slightly dropped, which indicates a negotiation between the thresholds, that there exist a number between 0.5 and 0.8 that generates better result.
+
+```
+
+### To Submit Your Assignment
+
+Please submit your assignment by first "knitting" your RMarkdown document into an html file and then commit, push and pull request both the RMarkdown file and the html file.
