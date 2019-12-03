@@ -11,6 +11,8 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+#read the data file and named d1
+D1<-read.csv("online.data.csv", header = TRUE)
 
 ```
 
@@ -18,14 +20,44 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+# library the package
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# the all variable
+
+D1$level.up <- ifelse(D1$level.up == "yes",1,0)
+
+D2 <- gather(D1, "measure", "score",2:7)
+
+# get the plot 
+
+p1 <- ggplot(D2, aes(score)) + facet_wrap(~measure, scales = "free")
+
+p1 + geom_histogram(stat = "count")
+
+
 #Then visualize the relationships between variables
 
+pairs(D1)
+
 #Try to capture an intution about the data and the relationships
+
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+#get the data we have and library the package
+
+library(rpart)
+
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
+printcp(c.tree1)
 
 #Plot and generate a CP table for your tree 
 
