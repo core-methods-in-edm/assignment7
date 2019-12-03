@@ -127,7 +127,7 @@ matrix2 <- as.matrix(table2)
 
 kappa(matrix2, exact = TRUE)/kappa(matrix1) # 1.598018
 
-# The second threshold of 0.8 has a higher kappa value than the first threshold of 0.6. It indicateds that the model with 0.8 threshold will have a better accuracy of predication.
+# The second threshold of 0.8 has a higher kappa value than the first threshold of 0.6. Precision and recall increase from 0.6 threshold to 0.8 threhold. It indicateds that the model with 0.8 threshold will have a better predication.
 ```
 
 ### To Submit Your Assignment
