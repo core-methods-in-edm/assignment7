@@ -32,7 +32,7 @@ online_data %>%
 #Then visualize the relationships between variables
 ggpairs(select(online_data, -id))
 #Try to capture an intution about the data and the relationships
-####解释一下
+#Messages have high correlation coeffient with post test score, which is .94. Pre and Post test score are somewhat correlated which is around .6. Pre test score, post test score and messages are alomost normal distributed. Forum post is skewed to the right. 
 ```
 #Classification tree
 ```{r}
