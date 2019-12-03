@@ -1,0 +1,156 @@
+---
+title: "Assignment 7 - Answers"
+author: "Su Won Jung"
+date: "12/03/2019"
+output: html_document
+---
+
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+
+## Part I
+
+#Upload data
+```{r}
+D1 <- read.csv("online.data.csv", header = TRUE)
+```
+
+#Visualization 
+```{r}
+#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+
+library(tidyr)
+library(dplyr)
+
+D1$level.up <-ifelse(D1$level.up=="yes",1,0) #yes/no into 1/0
+D2 <- gather(D1, "variables", "scores",-id)
+
+library(ggplot2)
+
+ggplot(D2, aes(scores)) +
+  geom_histogram(aes(y = stat(count)), fill="forest green") +
+  facet_wrap(~variables, scale = "free")
+
+
+#Then visualize the relationships between variables
+pairs(D1)
+
+#Try to capture an intution about the data and the relationships
+  #most of the relations is positive
+  # messages and pre.test.score seems to be highly correlated
+
+```
+#Classification tree
+```{r}
+#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+
+library(rpart)
+c.tree1 <- rpart(level.up ~ pre.test.score + messages + av.assignment.score, data = D1, method = "class", control = rpart.control(minsplit=1, cp=0.001))
+
+#Plot and generate a CP table for your tree 
+
+printcp(c.tree1)
+post(c.tree1, file = "tree1.ps", title = "Online Data") 
+
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
+
+D1$pred <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+```
+## Part II
+#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+```{r}
+#install.packages("ROCR")
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values")) #Unlist liberates the AUC value from the "performance" object created by ROCR
+#AUC = the probability that the fit model will score a randomly drawn positive sample higher than a randomly drawn negative sample = the value of the Wilcoxon-Mann-Whitney statistic
+
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree2 <- rpart(level.up ~ post.test.score + forum.posts, data = D1, method = "class", control = rpart.control(minsplit=1, cp=0.001))
+
+printcp(c.tree2)
+post(c.tree2, file = "tree2.ps", title = "Online Data") 
+
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+#first model seems to be better 
+  #the area under the curve = measure of a forecast's accuracy
+  #measure of 1 indicates perfect model; measure of 0.5 indicate random forecast
+  #first model's measure = 0.9959375; second model'smeasure = 0.9582812
+  
+```
+## Part III
+#Thresholds
+```{r}
+#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
+threshold.pred1 <- ifelse(D1$pred >= 0.5, 1, 0)
+D1$threshold.pred1 <- threshold.pred1
+
+#Now generate three diagnostics:
+
+D1$truepositive1 <- (threshold.pred1)*(D1$level.up)
+D1$truenegative1 <- (1-threshold.pred1)*(1-D1$level.up)
+D1$falsepositive1 <- (threshold.pred1)*(1-D1$level.up)
+D1$falsenegative1 <- (1-threshold.pred1)*(D1$level.up)
+
+D1$accuracy.model1 <-ifelse(D1$level.up == D1$threshold.pred1, 1, 0)
+
+D1$precision.model1 <- (sum(D1$truepositive1))/(sum(D1$truepositive1)+sum(D1$falsepositive1)) #precision= (true positives) / (true positives + false positives)
+
+#Finally, calculate Kappa for your model according to:
+
+#First generate the table of comparisons
+table1 <- table(D1$level.up, D1$threshold.pred1)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#kappa = 1.144378
+
+#------------------------------------------------------
+#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+threshold.pred2 <- ifelse(D1$pred >= 0.99, 1, 0)
+D1$threshold.pred2 <- threshold.pred2
+
+D1$truepositive2 <- (threshold.pred2)*(D1$level.up)
+D1$truenegative2 <- (1-threshold.pred2)*(1-D1$level.up)
+D1$falsepositive2 <- (threshold.pred2)*(1-D1$level.up)
+D1$falsenegative2 <- (1-threshold.pred2)*(D1$level.up)
+
+D1$accuracy.model2 <-ifelse(D1$level.up == D1$threshold.pred1, 1, 0)
+
+D1$precision.model2 <- (sum(D1$truepositive2))/(sum(D1$truepositive2)+sum(D1$falsepositive2)) 
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#kappa = 1.003904
+
+#cohen's kappa vlaue looks at the reliability between the data and the model
+#first model with lower threshold (0.5) has a higher kappa value (1.144378)
+#second model with higher threshold (0.99) has a lower kappa value (1.003904)
+
+
+```
+
+### To Submit Your Assignment
+
+Please submit your assignment by first "knitting" your RMarkdown document into an html file and then commit, push and pull request both the RMarkdown file and the html file.
