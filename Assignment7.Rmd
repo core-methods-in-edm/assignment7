@@ -11,27 +11,40 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1<-read.csv("online.data.csv",header=TRUE)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(tidyr)
+D2<-D1
+D2$level.up<-ifelse(D2$level.up=="yes",1,0)
+D3<-gather(D2,"variable","value",2:7)
+ggplot(D3,aes(value))+facet_wrap(~variable,scale="free")+geom_histogram(stat="count")
 
 #Then visualize the relationships between variables
+pairs(D2)
+## Post test score and average assignment score are positively related to the number of messages sent by each student to other students about the assignments.
 
 #Try to capture an intution about the data and the relationships
-
+## Students who send more messages about the assignment are more likely to obtain more information and knowledge about the assignment, thus getting higher scores.
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+c.tree1<-rpart(as.factor(level.up) ~ forum.posts + pre.test.score + post.test.score, method = "class", data = D1,control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
 
 #Plot and generate a CP table for your tree 
+printcp(c.tree1)
+plot(c.tree1)
+text(c.tree1, cex=0.6)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred1 <- predict(c.tree1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -39,29 +52,48 @@ D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" whic
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
+pred.detail1 <- prediction(D1$pred1, D1$level.up) 
+plot(performance(pred.detail1, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+c.tree2<-rpart(as.factor(level.up) ~ av.assignment.score + messages, method = "class", data = D1,control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
+printcp(c.tree2)
+plot(c.tree2)
+text(c.tree2, cex=0.6)
+
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+pred.detail2<- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+
+performance(pred.detail2,"acc")
+## The first model is better since the AUC value of the first model is a litter higher, which means the probability that the classifier will score are randomly drawn positive sample higher than a randomly drawn negative sample. Larger values of AUC are related to higher estimate-observation agreement.
+## The smoother the graph, the more cutoffs the predictions have. I also plotted a 45-degree line, which represents, on average, the performance of a Uniform(0, 1) random variable. The further away from the diagonal line, the better. Overall, I see that the predictions are similar.
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$threshold.pred1 <- ifelse(D1$pred1 >=0.8, 1, 0)
 
 #Now generate three diagnostics:
+table <- table(D1$threshold.pred1, D1$level.up)
+table
+D1$accuracy.model1 <- sum(diag(table))/sum(table)    ## 0.984
 
-D1$accuracy.model1 <-
+D1$precision.model1 <- table[2,2]/sum(table[2,])     ## 0.9752475
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+D1$recall.model1 <- table[2,2]/sum(table[,2])        ## 0.985
 
 #Finally, calculate Kappa for your model according to:
 
@@ -72,10 +104,29 @@ table1 <- table(D1$level.up, D1$threshold.pred1)
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa(matrix1, exact = TRUE)/kappa(matrix1)  ## 1.133458
+```
 
+```{r}
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+D1$threshold.pred2 <- ifelse(D1$pred1 >= 0.9, "yes", "no")
+D1$accuracy.model2 <- mean(ifelse(D1$level.up == D1$threshold.pred2, 1, 0))            ## 0.959
+D1$truepos.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
+D1$falsepos.model2 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
+D1$falseneg.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "no", 1,0)
+D1$precision.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falsepos.model2)) ## 0.9838275
+D1$recall.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falseneg.model2))   ## 0.9125
 
+table2 <- table(D1$level.up, D1$threshold.pred2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)    ## 1.13268
+
+
+## Results of two thresholds are similar.Kappa of the first threshold is a little higher, which means the extent of agreement among data collectors is called, “interrater reliability”, is higher. The accuracy of the first threshold is also a little higher than that of the second threshold.
 ```
 
 ### To Submit Your Assignment
