@@ -11,14 +11,33 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+D <- read.csv("online.data.csv", header = TRUE)
 
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+D1 <- D %>% 
+  mutate(
+    level.up = case_when(
+      level.up == "no" ~ 0,
+      level.up == "yes" ~ 1
+      )
+    ) 
+
+D1 %>% 
+  gather(key, value, -id) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~ key, scales = "free")
 
 #Then visualize the relationships between variables
+cor(D1) %>% 
+  corrplot::corrplot()
 
 #Try to capture an intution about the data and the relationships
 
@@ -26,16 +45,42 @@ In the following assignment you will be looking at data from an one level of an 
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+D1 <- D1 %>% 
+  mutate(level.up = factor(level.up))
 
+# model <- rpart(formula = level.up ~ post.test.score + messages + av.assignment.score, data = D2)
+model <- rpart(formula = level.up ~ pre.test.score + messages + av.assignment.score, data = D1)
+model$method
 #Plot and generate a CP table for your tree 
+
+rpart.plot::rpart.plot(model)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(model, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1 %>% count(pred, level.up)
+
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+D3 <- D2 
+%>%
+  # mutate(
+  #   pred = case_when(
+  #     pred == 0 ~ "no",
+  #     pred == 1 ~ "yes"
+  #   ) %>%
+  #     as.factor()
+  # ) %>%
+  mutate(
+    level.up = case_when(
+      level.up == "no" ~ 0,
+      level.up == "yes" ~ 1
+    )
+  )
+
 library(ROCR)
 
 #Plot the curve
