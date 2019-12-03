@@ -11,6 +11,9 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
+library(rpart)
+
+D1 <- read.csv("~/Desktop/HUDK4050/Assignment7/online.data.csv")
 
 ```
 
@@ -27,11 +30,17 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+c.tree <- rpart(level.up ~ forum.posts + av.assignment.score + messages, method = "class", data = D1)
+
+post(c.tree, file = "", title = "Level Up")
+
 #Plot and generate a CP table for your tree 
+printcp(c.tree)
+summary(c.tree)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D1$pred <- predict(c.tree, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -44,35 +53,48 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree2 <- rpart(level.up ~ pre.test.score + post.test.score, method = "class", data = D1)
+
+post(c.tree2, file = "", title = "Level Up")
+
+printcp(c.tree2)
+summary(c.tree2)
+
+D1$pred2 <- predict(c.tree2, type = "prob")[,2]
+
+pred.detail2 <- prediction(D1$pred2, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+# Performance for my first model was 0.995, and the performance for my second model was 0.855. The first model seems to be better, possibility because
+## average assignments scores are greater predictors of levelling up in comparison to post-test scores.
+
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
 
+
+  
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
-
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
 
 #Convert to matrix
-matrix1 <- as.matrix(table1)
+
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
