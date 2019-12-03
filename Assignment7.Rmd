@@ -11,27 +11,47 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1 <- read.csv("online.data.csv", header = TRUE)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+D2 <- gather(D1, "variable", "value", 2:7)
+ggplot(D2, mapping = aes(x = id, y = value)) +
+  geom_histogram(stat="identity", binwidth = 50) +
+  facet_wrap(~variable, scales = "free_y")
 
 #Then visualize the relationships between variables
-
-#Try to capture an intution about the data and the relationships
+library(corrplot)
+D3 <- D1 %>%
+      mutate(level.up = ifelse(level.up == "no",0,1))
+COR <- cor(D3)
+corrplot(COR, order="AOE", method="color", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 
 ```
+Try to capture an intution about the data and the relationships
+According to the histogram, we can see that students with id greater than 500 have higher average assignment score, lower number of messages, higher post test scores, higher pre test score, and tend to level up compared to students whose id numbers are smaller than 500. The number of forum post seems to be uniformly distributed. 
+
+Based on the correlation graph, post test score is negatively correlated with number of messages students sent to each other, which aligns with findings from the histogram. Average assignment score and post test score seem to be very relavent in relationship to other variables. 
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+c.tree1 <- rpart(as.factor(level.up) ~ post.test.score + messages + av.assignment.score, method = "class", data = D1)
 #Plot and generate a CP table for your tree 
-
+printcp(c.tree1)
+post(c.tree1, file = "tree1.ps", title = "CP Table1")
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
-
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+D3$pred <- predict(c.tree1, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -39,44 +59,98 @@ D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" whic
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(D3$pred, D3$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail, "auc"), "y.values"))
+#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+c.tree2 <- rpart(as.factor(level.up) ~ forum.posts + id + pre.test.score, method = "class", data = D1)
+printcp(c.tree2)
+post(c.tree2, file = "tree2.ps", title = "CP Table2")
+D3$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(D3$pred2, D3$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2, "auc"), "y.values"))
 ```
+The first model is better because the area under the curve is 1, which is greater than 0.8220833. AUC value of 1 denotes an excellent classifier, meaning a model whose predictions are 100% correct.
+
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+cutoff <- 0.5
+D3$threshold.pred1 <- D3$pred
+D3$threshold.pred1[D3$pred < cutoff] <- 0
+D3$threshold.pred1[D3$pred >= cutoff] <- 1
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+#first approach
+#library(caret)
+#table <- table(D3$threshold.pred1, D3$level.up)
+#confusionMatrix(table1)
 
-D1$precision.model1 <- 
+#cm <- as.matrix(table(Actual = D3$level.up, Predicted = D3$threshold.pred1))
+#accuracy = sum(diag(cm)) / sum(cm)
+#accuracy
 
-D1$recall.model1 <- 
+#precision = diag(cm) / (apply(cm, 2, sum))
+#precision
+
+#recall = diag(cm) / (apply(cm, 1, sum))
+#recall
+
+#second approach
+D3$accuracy.model1 <- mean(ifelse(D3$level.up == D3$threshold.pred1, 1, 0))
+D3$accuracy.model1 <- as.integer(D3$accuracy.model1)
+accuracy1 <- sum(D3$accuracy.model1) / length(D3$accuracy.model1)
+
+D3$precision.model1 <- ifelse(D3$level.up == 1 & D3$threshold.pred1 == 1, 1, 0)
+precision1 <- sum(D3$precision.model1) / sum (D3$threshold.pred1)
+
+D3$recall.model1 <- ifelse(D3$level.up == 1 & D3$threshold.pred1 == 1, 1, 0)
+recall1 <- sum(D3$precision.model1) / sum(D3$level.up)
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(D3$level.up, D3$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
+matrix1
 
 #Calculate kappa
-kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa(as.numeric(matrix1), exact = TRUE)/kappa(as.numeric(matrix1))
+
+#another approach to calcluate kappa
+#expAccuracy = sum((apply(cm, 1, sum)/sum(cm))*(apply(cm, 2, sum)/sum(cm)))
+#kappa = (accuracy - expAccuracy) / (1 - expAccuracy)
+#kappa
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+cutoff2 = 1
+D3$threshold.pred2 <- D3$pred
+D3$threshold.pred2[D3$pred < cutoff] <- 0
+D3$threshold.pred2[D3$pred == cutoff] <- 1
 
+D3$accuracy.model2 <- mean(ifelse(D3$level.up == D3$threshold.pred2, 1, 0))
+D3$accuracy.model2 <- as.integer(D3$accuracy.model2)
+accuracy2 <- sum(D3$accuracy.model2) / length(D3$accuracy.model2)
+
+D3$precision.model2 <- ifelse(D3$level.up == 1 & D3$threshold.pred2 == 1, 1, 0)
+precision2 <- sum(D3$precision.model2) / sum (D3$threshold.pred2)
+
+D3$recall.model2 <- ifelse(D3$level.up == 1 & D3$threshold.pred2 == 1, 1, 0)
+recall2 <- sum(D3$precision.model2) / sum(D3$level.up)
 ```
+Accuracy, precision, and recall all maintain at the same level for model 1 because ROC for model 1 is a classifier with the perfect performance level for it shows a combination of two straight lines – from the origin (0.0, 0.0) to the top left corner (0.0, 1.0). 
 
 ### To Submit Your Assignment
 
