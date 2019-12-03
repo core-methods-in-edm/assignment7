@@ -1,7 +1,7 @@
 ---
-title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+title: "Assignment 7"
+author: "Allison Teevan"
+date: "11/22/19"
 output: html_document
 ---
 
@@ -11,62 +11,134 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+data <- read.csv("online.data.csv", header = TRUE)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+data$level.up <- ifelse(data$level.up == "yes", 1,0)
+attach(data)
+
+hist(post.test.score)
+hist(pre.test.score)
+hist(messages)
+hist(forum.posts)
+hist(av.assignment.score)
+hist(level.up)
 
 #Then visualize the relationships between variables
+library(corrplot)
+COR <- cor(data)
+
+corrplot(COR, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+
+pairs(data)
 
 #Try to capture an intution about the data and the relationships
-
+# it looks like post test score and number of messages are strongly correlated. Number of forum posts and post test score are much less correlated. Post test score and pre test score are somewhat correlated. Interestingly, ID and pre test score are correlated. This could be because the data was sorted by pre test score before being assigned an ID?
 ```
+
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+library(rpart)
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score + messages, method = "class", data = data, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
 #Plot and generate a CP table for your tree 
+plot(c.tree1)
+text(c.tree1)
+printcp(c.tree1)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+data$pred <- predict(c.tree1, type = "prob")[,2] #Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classification is based on.
+
+
 ```
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+#install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(data$pred, data$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree2 <- rpart(level.up ~ post.test.score + av.assignment.score, method = "class", data = data, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+
+plot(c.tree2)
+text(c.tree2)
+printcp(c.tree2)
+data$pred2 <- predict(c.tree2, type = "prob")[,2]
+pred.detail2 <- prediction(data$pred2, data$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
+#My second model is better. It includes less variables, so that surprises me. I guess it makes sense because post test score is probably what's used to determine if a student "levels up". Perhaps, because it is 100%, the combination of these two variables is what predicts if a student levels up.
+
+#I then repeated the process with just avg assignment score (excluding post test score):
+c.tree3 <- rpart(level.up ~ av.assignment.score, method = "class", data = data, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+plot(c.tree3)
+text(c.tree3)
+printcp(c.tree3)
+data$pred3 <- predict(c.tree3, type = "prob")[,2]
+pred.detail3 <- prediction(data$pred3, data$level.up) 
+plot(performance(pred.detail3, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail3,"auc"), "y.values"))
+
+#and with just post.test.score. 
+c.tree4 <- rpart(level.up ~ post.test.score, method = "class", data = data, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+data$pred4 <- predict(c.tree4, type = "prob")[,2]
+pred.detail4 <- prediction(data$pred4, data$level.up) 
+plot(performance(pred.detail4, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail4,"auc"), "y.values"))
+
+#it appears my hypothesis is correct. Since just post test score doesn't lead to 100%, they must be including avg assignment scores. 
+
+#the best model includes post.test.score + av.assignment.score.
+
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+data$threshold.pred1 <- ifelse(data$pred >= 0.8, "1", "0")
 
 #Now generate three diagnostics:
+  
+data$accuracy.model1 <- mean(ifelse(data$level.up == data$threshold.pred1, 1, 0))
+data$truepos.model1 <- ifelse(data$level.up == "1" & data$threshold.pred1 == "1", 1, 0)
+data$falsepos.model1 <- ifelse(data$level.up == "0" & data$threshold.pred1 == "1", 1,0)
+data$falseneg.model1 <- ifelse(data$level.up == "1" & data$threshold.pred1 == "0", 1,0)
 
-D1$accuracy.model1 <-
+data$precision.model1 <- sum(data$truepos.model1)/(sum(data$truepos.model1) + sum(data$falsepos.model1))
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+data$recall.model1 <- sum(data$truepos.model1)/(sum(data$truepos.model1) + sum(data$falseneg.model1))
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+(table1 <- table(data$level.up, data$threshold.pred1))
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -75,6 +147,49 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+data$threshold.pred2 <- ifelse(data$pred >= 0.95, "1", "0")
+
+#Now generate three diagnostics:
+  
+data$accuracy.model2 <- mean(ifelse(data$level.up == data$threshold.pred2, 1, 0))
+data$truepos.model2 <- ifelse(data$level.up == "1" & data$threshold.pred2 == "1", 1, 0)
+data$falsepos.model2 <- ifelse(data$level.up == "0" & data$threshold.pred2 == "1", 1,0)
+data$falseneg.model2 <- ifelse(data$level.up == "1" & data$threshold.pred2 == "0", 1,0)
+data$precision.model2 <- sum(data$truepos.model2)/(sum(data$truepos.model2) + sum(data$falsepos.model2))
+data$recall.model2 <- sum(data$truepos.model2)/(sum(data$truepos.model2) + sum(data$falseneg.model2))
+
+#Kappa
+table2 <- table(data$level.up, data$threshold.pred2)
+(matrix2 <- as.matrix(table2))
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+
+#CONCLUSION:
+#Kappa is lower when the threshold is higher?
+#I'm not sure this is accurate, so I will test with a lower threshold.
+
+data$threshold.pred3 <- ifelse(data$pred >= 0.75, "1", "0")
+
+#Now generate three diagnostics:
+  
+data$accuracy.model3 <- mean(ifelse(data$level.up == data$threshold.pred3, 1, 0))
+data$truepos.model3 <- ifelse(data$level.up == "1" & data$threshold.pred3 == "1", 1, 0)
+data$falsepos.model3 <- ifelse(data$level.up == "0" & data$threshold.pred3 == "1", 1,0)
+data$falseneg.model3 <- ifelse(data$level.up == "1" & data$threshold.pred3 == "0", 1,0)
+data$precision.model3 <- sum(data$truepos.model3)/(sum(data$truepos.model3) + sum(data$falsepos.model3))
+data$recall.model3 <- sum(data$truepos.model3)/(sum(data$truepos.model3) + sum(data$falseneg.model3))
+
+#Kappa
+table3 <- table(data$level.up, data$threshold.pred3)
+matrix3 <- as.matrix(table3)
+kappa(matrix3, exact = TRUE)/kappa(matrix3)
+
+table1
+table2
+table3
+
+#Kappa is higher. So I conclude that Kappa can vary depending on the ROC curve. Picking a threshold is a balance between true positive and false positives. I think table 3 actually does the best job in this case.
+
 
 ```
 
