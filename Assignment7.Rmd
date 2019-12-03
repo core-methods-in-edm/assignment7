@@ -11,27 +11,40 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+data<-read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+library(tidyverse)
+data1<-gather(data,"variable","num")
+ggplot(data1, aes(x=num)) + 
+  geom_histogram(stat = "count") + 
+  facet_wrap(~variable, scales = "free")
 
 #Then visualize the relationships between variables
+pairs(data)
 
 #Try to capture an intution about the data and the relationships
+
+# The messages and post.test.score have a extremely strong correlation. messages and
+# av.assignment score also has a strong correlation. Therefore, messages might be a 
+# good indicator of scores. post.test.scores and w.assignment.score also seems to 
+# be correlated.
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+class<-rpart(level.up~av.assignment.score + post.test.score + messages,data)
 #Plot and generate a CP table for your tree 
-
+printcp(class)
+post(class,file = "class.ps",title = "level.up")
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+data$pred <- predict(class, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -39,34 +52,53 @@ D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" whic
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(data$pred, data$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+class1<-rpart(level.up~pre.test.score + forum.posts,data)
+printcp(class1)
+post(class1, file = "class1.ps", title = "level up")
+data$pred1 <- predict(class1, type = "prob")[,2]
+pred.detail1 <- prediction(data$pred1, data$level.up) 
+plot(performance(pred.detail1, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+# The first one is a better model. Its cross-validation error is 0, which is smaller than the 0.5875 
+# error of the second model. In addition, the AUC value of the first model is larger that of the second
+# model. 
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+#Try 0.6 for threshold
+threshold.pred1 <- ifelse(data$pred1>0.6,1,0)
+data$pred1.result<-ifelse(data$pred1>0.6,1,0)
+
+#calculate the true positive, false positive, true negative and false negative
+data$tp<-ifelse(data$level.up=="yes" & data$pred1.result == 1,1,0)
+data$fp<-ifelse(data$level.up=="no" & data$pred1.result == 1,1,0)
+data$tn<-ifelse(data$level.up=="no" & data$pred1.result == 0,1,0)
+data$fn<-ifelse(data$level.up=="yes" & data$pred1.result == 0,1,0)
 
 #Now generate three diagnostics:
+data$level.up1<-ifelse(data$level.up=="yes",1,0)
+accuracy.model1 <- mean(data$pred1.result == data$level.up1)
 
-D1$accuracy.model1 <-
+precision.model1 <- sum(data$tp)/(sum(data$tp)+sum(data$fp))
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
+recall.model1 <- sum(data$tp)/(sum(data$tp)+sum(data$fn))
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(data$level.up1, data$pred1.result)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -74,9 +106,69 @@ matrix1 <- as.matrix(table1)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
+#I get a kappa value of 1.05 which is more than 1. I will try another way I found online
+#observed accuracy
+oa<-mean(data$pred1.result == data$level.up1)
+#expected accuracy
+tp<-sum(data$tp)
+fp<-sum(data$fp)
+fn<-sum(data$fn)
+tn<-sum(data$tn)
+ea<-((tp+fp)/1000)*((tp+fn)/1000)+((tn+fn)/1000)*((tn+fp)/1000)
+#kappa=(oa-ea)/(1-ea)
+k<-(oa-ea)/(1-ea)
+
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+#Try 0.3 for threshold
+threshold.pred2 <- ifelse(data$pred1>0.3,1,0)
+data$pred2.result<-ifelse(data$pred1>0.3,1,0)
+
+#calculate the true positive, false positive, true negative and false negative
+data$tp1<-ifelse(data$level.up=="yes" & data$pred2.result == 1,1,0)
+data$fp1<-ifelse(data$level.up=="no" & data$pred2.result == 1,1,0)
+data$tn1<-ifelse(data$level.up=="no" & data$pred2.result == 0,1,0)
+data$fn1<-ifelse(data$level.up=="yes" & data$pred2.result == 0,1,0)
+
+#Now generate three diagnostics:
+accuracy.model2 <- mean(data$pred2.result == data$level.up1)
+
+precision.model2 <- sum(data$tp1)/(sum(data$tp1)+sum(data$fp1))
+
+recall.model2 <- sum(data$tp1)/(sum(data$tp1)+sum(data$fn1))
+
+#Finally, calculate Kappa for your model according to:
+#observed accuracy
+oa1<-mean(data$pred2.result == data$level.up1)
+#expected accuracy
+tp1<-sum(data$tp1)
+fp1<-sum(data$fp1)
+fn1<-sum(data$fn1)
+tn1<-sum(data$tn1)
+ea1<-((tp1+fp1)/1000)*((tp1+fn1)/1000)+((tn1+fn1)/1000)*((tn1+fp1)/1000)
+#kappa=(oa-ea)/(1-ea)
+k1<-(oa1-ea1)/(1-ea1)
+
+
+
+
+
 
 ```
+model 1
+Threshold - 0.6
+kappa - 0.557
+accuracy - 0.783
+precision - 0.705
+recall - 0.788
+
+model 2
+Threshold - 0.3
+kappa - 0.547
+accuracy - 0.769
+precision - 0.654
+recall - 0.895
+
+The model with 0.6 threshold has slightly higher kappa and accuracy compares to the model with 0.3 threhold. That indicates model with 0.6 threhold will have a better prediction. I didn't try 0.5 threshold, but I think it's worth mentioning that the reason of 0.6 threshold has a better prediction might be it's closer to 0.5 compares to 0.3 threhold. 
 
 ### To Submit Your Assignment
 
