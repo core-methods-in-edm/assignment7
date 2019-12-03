@@ -407,7 +407,7 @@ printcp(c.tree)</code></pre>
 ##       CP nsplit rel error xerror     xstd
 ## 1 0.9300      0    1.0000  1.000 0.038730
 ## 2 0.0325      1    0.0700  0.070 0.013042
-## 3 0.0100      2    0.0375  0.065 0.012581</code></pre>
+## 3 0.0100      2    0.0375  0.045 0.010511</code></pre>
 <pre class="r"><code>summary(c.tree)</code></pre>
 <pre><code>## Call:
 ## rpart(formula = level.up ~ forum.posts + av.assignment.score + 
@@ -417,7 +417,7 @@ printcp(c.tree)</code></pre>
 ##       CP nsplit rel error xerror       xstd
 ## 1 0.9300      0    1.0000  1.000 0.03872983
 ## 2 0.0325      1    0.0700  0.070 0.01304224
-## 3 0.0100      2    0.0375  0.065 0.01258074
+## 3 0.0100      2    0.0375  0.045 0.01051071
 ## 
 ## Variable importance
 ## av.assignment.score            messages         forum.posts 
@@ -503,7 +503,7 @@ post(c.tree2, file = &quot;&quot;, title = &quot;Level Up&quot;)</code></pre>
 ## 
 ##       CP nsplit rel error xerror     xstd
 ## 1 0.6025      0    1.0000 1.0000 0.038730
-## 2 0.0100      1    0.3975 0.4425 0.030174</code></pre>
+## 2 0.0100      1    0.3975 0.4575 0.030569</code></pre>
 <pre class="r"><code>summary(c.tree2)</code></pre>
 <pre><code>## Call:
 ## rpart(formula = level.up ~ pre.test.score + post.test.score, 
@@ -512,7 +512,7 @@ post(c.tree2, file = &quot;&quot;, title = &quot;Level Up&quot;)</code></pre>
 ## 
 ##       CP nsplit rel error xerror       xstd
 ## 1 0.6025      0    1.0000 1.0000 0.03872983
-## 2 0.0100      1    0.3975 0.4425 0.03017356
+## 2 0.0100      1    0.3975 0.4575 0.03056867
 ## 
 ## Variable importance
 ## post.test.score  pre.test.score 
