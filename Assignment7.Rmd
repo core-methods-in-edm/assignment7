@@ -1,6 +1,6 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
+author: "Charles Lang edited by Hsiao-Ting Yang"
 date: "11/30/2016"
 output: html_document
 ---
