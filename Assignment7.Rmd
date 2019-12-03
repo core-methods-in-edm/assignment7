@@ -94,9 +94,9 @@ unlist(slot(performance(pred.detail1,"auc"), "y.values"))
 ## Part III
 #Thresholds
 
-
-
 ```{r}
+##Look at the ROCR plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives.Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+
 ##Because my first model has a very high accuracy, I use the second one in this part instead of the first model.
 
 D1$threshold.pred1 <- ifelse(D1$pred1 >= 0.43, "yes", "no") 
@@ -125,7 +125,7 @@ matrix1 <- as.matrix(table1)
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
-install.packages("psych")
+#install.packages("psych")
 library(psych)
 cohen.kappa(table1)
 
@@ -144,8 +144,8 @@ table2 <- table(D1$level.up, D1$threshold.pred2)
 cohen.kappa(table2)
 
 ## A：The second model with a little higher value of kappa but not obvious (i.e., unweighted kappa of the pred.model2 are 0.5, 0.56, and 0.61; unweighted kappa of the pred.model1 are 0.5, 0.55, and 0.6). Personally, both of them could be used as a predictional model. The pred.model2 is slightly better than the pred.model1 due to the bigger value of unweighted kappa. Otherwise, I should change the value of the probability threshold rather than 0.60.
-
 ```
+
 
 ### To Submit Your Assignment
 
