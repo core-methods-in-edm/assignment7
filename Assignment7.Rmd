@@ -1,55 +1,146 @@
 ---
 title: "Assignment 7 - Answers"
 author: "Charles Lang"
-date: "11/30/2016"
-output: html_document
+date: "12/3/2019"
+output: 
+  html_document:
+    toc: true
 ---
 
 In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
+```{r, result = 'hide'}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(corrplot)
+library(RColorBrewer)
+library(rpart)
+library(rpart.plot)
+library(caret)
+```
+
 ## Part I
 
-#Upload data
+### Upload data
 ```{r}
-
+tutor <- read.csv("online.data.csv", header = TRUE)
+# Recode "level.up": yes = 1, no = 0
+tutor_recode <- tutor %>%
+      mutate(level.up = ifelse(level.up == "no",0,1))
+tutor_recode$level.up <- as.numeric(as.factor(tutor_recode$level.up))
 ```
 
-#Visualization 
+### Visualization   
+Reference: https://drsimonj.svbtle.com/quick-plot-of-all-variables  
 ```{r}
-#Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+# Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+tutor_recode %>%
+  keep(is.numeric) %>% 
+  gather() %>%   # Convert to key-value pairs
+  ggplot(aes(value)) +  # Plot the values
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
 
-#Then visualize the relationships between variables
+# Then visualize the relationships between variables
+tutor_corr <- cor(tutor_recode %>% keep(is.numeric))
+corrplot(tutor_corr, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
 
-#Try to capture an intution about the data and the relationships
-
+# Try to capture an intution about the data and the relationships
+# Level up or not is highly correlated with average assignment score, messages sent by each student to other students about the assignments, and post-test score.
 ```
-#Classification tree
+
+### Classification tree
 ```{r}
-#Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+# create assignment of data
+assignment <- sample(1:2, size = nrow(tutor), prob = c(.8, .2), replace = TRUE)
 
-#Plot and generate a CP table for your tree 
+# Create a training and testing data from the original data 
+tutor_train <- tutor[assignment == 1, ]    # subset grade to training indices only
+tutor_test <- tutor[assignment == 2, ]   # subset grade to test indices only
 
-#Generate a probability value that represents the probability that a student levels up based your classification tree 
+# Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+tutor.tree <- rpart(formula = level.up ~ av.assignment.score + post.test.score + messages,
+                    data = tutor_train,
+                    control = rpart.control(minsplit = 1, minbucket = 1))
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+# Retrieve optimal cp value based on cross-validated error
+opt_index <- which.min(tutor.tree$cptable[, "xerror"])
+cp_opt <- tutor.tree$cptable[opt_index, "CP"]
+
+# Prune the model (to optimized cp value)
+tutor.tree.opt <- prune(tree = tutor.tree, 
+                         cp = cp_opt)
+
+# Plot and generate a CP table for your tree 
+post(tutor.tree.opt, file = "tutor_tree.ps", title = "Level up") # This creates a pdf image of the tree
+
+# another way to plot
+rpart.plot(x = tutor.tree.opt, yesno = 2, type = 0, extra = 0, main = "Level up")
+
+# Generate a probability value that represents the probability that a student levels up based your classification tree 
+tutor_test$pred <- predict(tutor.tree.opt, tutor_test, type = "prob")[,2]
+# Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+# Intention is to use the label “1” probabilities to compare against actual “level.up” values and come up with ROC curve. We need only the second column (probabilities for label “1”) from the output of “predict” function to be passed as input into “prediction” function.
 ```
-## Part II
-#Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
+
+
+
+## Part II  
+Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.    
 ```{r}
 library(ROCR)
 
-#Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+# Plot the curve
+pred.detail <- prediction(tutor_test$pred, tutor_test$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
-#Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
-
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+# Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail, "auc"), "y.values"))
+# Unlist liberates the AUC value from the "performance" object created by ROCR
 ```
-## Part III
-#Thresholds
+
+Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?  
+The first model is better since AUC is higher than that of the second model.
+```{r}
+# Create a classification tree using other two variables
+tutor.tree2 <- rpart(formula = level.up ~ pre.test.score + forum.posts,
+                    data = tutor_train,
+                    control = rpart.control(minsplit = 1, minbucket = 1))
+
+# Retrieve optimal cp value based on cross-validated error
+opt_index2 <- which.min(tutor.tree2$cptable[, "xerror"])
+cp_opt2 <- tutor.tree2$cptable[opt_index2, "CP"]
+
+# Prune the model (to optimized cp value)
+tutor.tree.opt2 <- prune(tree = tutor.tree2, 
+                         cp = cp_opt2)
+
+# Plot and generate a CP table for your tree 
+post(tutor.tree.opt2, file = "tutor_tree2.ps", title = "Level up") # This creates a pdf image of the tree
+
+# another way to plot
+rpart.plot(x = tutor.tree.opt2, yesno = 2, type = 0, extra = 0, main = "Level up")
+
+# Generate a probability value that represents the probability that a student levels up based your classification tree 
+tutor_test$pred2 <- predict(tutor.tree.opt2, tutor_test, type = "prob")[,2]
+
+# Plot the curve
+pred.detail2 <- prediction(tutor_test$pred2, tutor_test$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+# Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail2, "auc"), "y.values"))
+```
+
+
+
+## Part III  
+### Thresholds  
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
