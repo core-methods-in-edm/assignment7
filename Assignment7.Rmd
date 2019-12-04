@@ -1,5 +1,5 @@
 ---
-title: "Assignment 8 - Answers"
+title: "Assignment 7 - Answers"
 author: "Chenyu Yan"
 date: "11/25/2019"
 output: html_document
@@ -40,55 +40,75 @@ cor(D1) %>% corrplot::corrplot()
 
 library(rpart)
 #Plot and generate a CP table for your tree 
-model <- rpart(formula = level.up ~ pre.test.score+messages+av.assignment.score, data=D1)
+M1 <- rpart(formula = as.factor(level.up)~pre.test.score+messages+av.assignment.score, data=D1)
+printcp(M1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 library(rpart.plot)
-rpart.plot(model)
+rpart.plot(M1)
 
-#D1$pred <- predict(model,type = "prob")[,2]
+D1$pred <- predict(M1,type = "prob")[,2]
 #Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 
-#D1 %>% count(pred,level.up)
+D1 %>% count(pred,level.up)
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
-# library(ROCR)
-# 
-# #Plot the curve
-# pred.detail <- prediction(D1$pred, D1$level.up) 
-# plot(performance(pred.detail, "tpr", "fpr"))
-# abline(0, 1, lty = 2)
-# 
-# #Calculate the Area Under the Curve
-# unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+library(ROCR)
+
+#Plot the curve
+pred.detail <- prediction(D1$pred, D1$level.up)
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+#Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+M2 <- rpart(formula = as.factor(level.up)~pre.test.score+forum.posts, data=D1)
+printcp(M2)
+rpart.plot(M2)
+D1$pred2 <- predict(M2,type = "prob")[,2]
+D1 %>% count(pred2,level.up)
+
+pred.detail2 <- prediction(D1$pred2, D1$level.up)
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
+
 ```
+### Answer
+The first model is better.The first curve is closer to the upper left corner than the second one. This feature shows that the model is more efficient. In detials, the frist curve has a larger true positive rate and smaller false positive rate. Additionally, the area of frist curve is bigger indicating a greater accuracy.
+
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+perf <- performance(pred.detail, "tpr", "fpr")
+cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], tpr=perf@y.values[[1]])
+cutoffs <- cutoffs[order(cutoffs$tpr, decreasing=TRUE),]
+threshold.pred1 <- cutoffs$cut[1]
 
-# threshold.pred1 <- 
-# 
-# #Now generate three diagnostics:
-# 
+ 
+#Now generate three diagnostics:
+ 
 # D1$accuracy.model1 <-
-# 
+#  
 # D1$precision.model1 <- 
-# 
+#  
 # D1$recall.model1 <- 
-# 
-# #Finally, calculate Kappa for your model according to:
-# 
-# #First generate the table of comparisons
+ 
+#Finally, calculate Kappa for your model according to:
+ 
+#First generate the table of comparisons
 # table1 <- table(D1$level.up, D1$threshold.pred1)
-# 
-# #Convert to matrix
+ 
+#Convert to matrix
 # matrix1 <- as.matrix(table1)
-# 
-# #Calculate kappa
+ 
+#Calculate kappa
 # kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
