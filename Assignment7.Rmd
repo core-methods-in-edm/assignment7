@@ -69,7 +69,7 @@ unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AU
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 
-c.tree2 <- rpart (as.factor(level.up)~messages+forum.posts+av.assignment.score,method = "class",data=D1,control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
+c.tree2 <- rpart (as.factor(level.up)~post.test.score+pre.test.score,method = "class",data=D1,control=rpart.control(minsplit=1,minbucket=1,cp=0.001))
 printcp(c.tree2)
 rpart.plot(c.tree2)
 post(c.tree2, file = "tree2.ps")
