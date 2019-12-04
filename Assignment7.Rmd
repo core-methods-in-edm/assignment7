@@ -5,12 +5,17 @@ date: "11/30/2016"
 output: html_document
 ---
 
-In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+In the following assignment you will be looking at data from one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
 
 ## Part I
 
 #Upload data
 ```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+t.data <- read.csv("~/tmp/assignment7/online.data.csv", stringsAsFactors = FALSE)
 
 ```
 
@@ -18,20 +23,61 @@ In the following assignment you will be looking at data from an one level of an 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+# a 1 indicates level up, 0 indicates no level up.
+
+t.data1<-t.data[,2:6]
+
+ggplot(gather(t.data1), aes(value))+
+  geom_histogram(bins = 10)+
+  facet_wrap(~key, scales = 'free_x')
+
 #Then visualize the relationships between variables
 
-#Try to capture an intution about the data and the relationships
+library(corrplot)
+
+COR.data1<-cor(t.data1)
+
+corrplot(COR.data1, order="AOE", method="circle", tl.pos="lt", type="upper",        
+tl.col="black", tl.cex=0.6, tl.srt=45, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
+
+# Try to capture an intution about the data and the relationships
+## E-mail Anna to ask for clarification about this
+
+# messages and  is not tightly correlated with anything, so it's not particularly useful
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+library(rpart)
+library(rpart.plot)
+
+pca <-prcomp(t.data1, scale. = TRUE)
+summary(pca)
+
+View(pca$rotation)
+
+
+c.tree <- rpart(level.up ~ post.test.score+av.assignment.score+forum.posts, method="class", data=t.data)
+
 #Plot and generate a CP table for your tree 
+
+printcp(c.tree)
+rpart.plot(c.tree)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+t.data$pred <- predict(c.tree, t.data, type = "prob")[,2]
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+
+for(i in 1:nrow(t.data)){
+  t.data$level.up1[i]<-ifelse(t.data$level.up[i]=="yes",1,0)
+}
+
+
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
@@ -39,34 +85,61 @@ D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" whic
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(t.data$pred, t.data$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+c.tree1 <- rpart(level.up ~ pre.test.score+messages, method="class", data=t.data)
+t.data$pred2 <- predict(c.tree1, t.data, type = "prob")[,2]
+
+pred.detail2 <- prediction(t.data$pred2, t.data$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+
+
 ```
 ## Part III
-#Thresholds
+##Thresholds
 ```{r}
-#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+t.data$pred2 <- predict(c.tree1, t.data, type = "prob")[,2]
+threshold.pred1 <- .8
 
-threshold.pred1 <- 
+for(i in 1:nrow(t.data)){
+  t.data$pred2[i]<-ifelse(t.data$pred2[i]>threshold.pred1,1,0)
+}
 
+for(i in 1:nrow(t.data)){
+  if(t.data$level.up1[i]==1){
+    t.data$acc[i]<-ifelse(t.data$level.up1[i]==t.data$pred2[i], "TP", "FN")
+  }else{
+    t.data$acc[i]<-ifelse(t.data$level.up1[i]==t.data$pred2[i], "TN", "FP")
+  }
+}
+
+test <- table(t.data$acc)
+test<-data.frame(test)
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+accuracy <-(test[3,2]+test[4,2])/((test[1,2]+test[2,2]+test[3,2]+test[4,2]))
 
-D1$precision.model1 <- 
+precision <- test[4,2]/(test[4,2]+test[2,2])
 
-D1$recall.model1 <- 
+recall <- test[4,2]/(test[4,2]+test[1,2])
+
+testI<-table(accuracy, precision, recall)
+
+View(testI)
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(t.data$level.up1, t.data$pred2)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -76,7 +149,46 @@ kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+t.data$pred2 <- predict(c.tree1, t.data, type = "prob")[,2]
+threshold.pred1 <- .9
+
+for(i in 1:nrow(t.data)){
+  t.data$pred2[i]<-ifelse(t.data$pred2[i]>threshold.pred1,1,0)
+}
+
+for(i in 1:nrow(t.data)){
+  if(t.data$level.up1[i]==1){
+    t.data$acc[i]<-ifelse(t.data$level.up1[i]==t.data$pred2[i], "TP", "FN")
+  }else{
+    t.data$acc[i]<-ifelse(t.data$level.up1[i]==t.data$pred2[i], "TN", "FP")
+  }
+}
+
+test1 <- table(t.data$acc)
+test1<-data.frame(test1)
+#Now generate three diagnostics:
+
+accuracy <-(test1[3,2]+test1[4,2])/((test1[1,2]+test1[2,2]+test1[3,2]+test1[4,2]))
+
+precision <- test1[4,2]/(test1[4,2]+test1[2,2])
+
+recall <- test1[4,2]/(test1[4,2]+test1[1,2])
+
+testI1<-table(accuracy, precision, recall)
+
+View(test1)
+
+table1 <- table(t.data$level.up1, t.data$pred2)
+
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
 ```
+
+I chose an initial threshold of .8, which generated a fairly high accuracy. However, increasing the threshold to over .9 eliminated any possibility of my second decision tree having a true positive or false positive, which in turn gave me a far lower accuracy, 0 precision, and undefined recall. Moreover it generated the same kappa as before. I am thus encouraged to continue using the .8 as my threshhold.
 
 ### To Submit Your Assignment
 
