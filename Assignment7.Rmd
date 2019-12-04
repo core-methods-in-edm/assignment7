@@ -79,7 +79,7 @@ pred.detail2 <- prediction(D1$pred2, D1$level.up)
 plot(performance(pred.detail2, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 unlist(slot(performance(pred.detail2,"auc"), "y.values"))
-
+#0.9744167
 ```
 ## Part III
 #Thresholds
