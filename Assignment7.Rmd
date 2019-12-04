@@ -1,7 +1,7 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+author: "Zifan Cao"
+date: "12/03/2019"
 output: html_document
 ---
 
@@ -11,7 +11,7 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+A1 <- read.csv("online.data.csv")
 ```
 
 #Visualization 
@@ -21,7 +21,14 @@ In the following assignment you will be looking at data from an one level of an 
 #Then visualize the relationships between variables
 
 #Try to capture an intution about the data and the relationships
-
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+A1$level.up <- ifelse(A1$level.up == "yes", 1,0)
+A2 <- gather(A1, "level", "score", 2:7)
+plot1 <- ggplot(A2, aes(score)) + facet_wrap(~level, scales = "free")
+plot1 + geom_histogram(stat = "count")
+pairs(A1)
 ```
 #Classification tree
 ```{r}
@@ -30,23 +37,23 @@ In the following assignment you will be looking at data from an one level of an 
 #Plot and generate a CP table for your tree 
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+library(rpart.plot)
+c.treea <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = A1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(c.treea)
+post(c.treea, file = "treea.ps", title = "level")
+rpart.plot(c.treea, type=3, box.palette = c("red", "green"), fallen.leaves = TRUE)
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+A1$pred <- predict(c.treea, A1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
-library(ROCR)
 
+library(ROCR)
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
-abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
-#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
 ## Part III
 #Thresholds
