@@ -1,7 +1,7 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Charles Lang"
-date: "11/30/2016"
+author: "Qiyang (Minnie) Lin"
+date: "11/26/2019"
 output: html_document
 ---
 
@@ -11,23 +11,48 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1<- read.csv("online.data.csv")
+library(ggplot2)
+library(tidyr)
+library(rpart)
+library(rpart.plot)
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
 
+D2<- gather(D1, key, value)
+  
+ggplot(D2, aes(value,key) )+
+    facet_wrap(~ key , scales = "free")+
+    geom_histogram(stat = "identity")
+
+
 #Then visualize the relationships between variables
 
+pairs(D1, labels = colnames(D1), main = "Relationships Between Variables",upper.panel = NULL, pch = 21, cex = 0.5,  bg = c("#00AFBB", "#FC4E07")[D1$level.up])
+
 #Try to capture an intution about the data and the relationships
+
+
+#Answer: About the data, all the numerical variables appear to be normal shape. id is uniform shape. And the propotion of level up students are less than not level up students. 
+#id seems to show no relationship between any of other variables. The number of messages sent by students are clearly(and highly) postively correltate with post test scores. Other vaiables, such as pre-test scores, form.posts, have relatively postive correlation with other variables except id. Level up seems to be postively related to all the variables except id and forum posts. Those who did level up have higher pre-test, post-test, and average assignment score. 
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+rp<- rpart(level.up ~ post.test.score + messages + av.assignment.score, data = D1 )
+
+# I choose these three variables because (1)they have correlation between level up. (2)Teachers can track their process during the use of online system(av.assignment.score) and their social interatction(messages), and then after the use of system(post.test.score)
+
+
 #Plot and generate a CP table for your tree 
+
+printcp(rp)
+rpart.plot(rp)
 
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
@@ -36,6 +61,7 @@ D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" whic
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+#install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
@@ -44,24 +70,41 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+rp2<- rpart(level.up ~ forum.posts + pre.test.score, data = D1 )
+
+printcp(rp2)
+rpart.plot(rp2)
+
+D1$pred2 <- predict(rp2, type = "prob")[,2]
+pred.detail2<- prediction(D1$pred2, D1$level.up)
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0,1,lty = 2)
+
+#The first model is better. Becuase ROC curve in the first model have 100% sensitivy(TPR) and 100% specificy (FPR). The area under the curve is 1. 
+
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+##since my first model is perfect accroding to the ROC curve. I will choose the second model to do this part. 
+D1$threshold.pred1 <- ifelse(D1$pred2 >= 0.5, 1,0)
+D1$truepos1<- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "1",1,0)
+D1$falsepos1<- ifelse(D1$level.up =="no" & D1$threshold.pred1 =="1",1,0)
+D1$falseneg1<- ifelse(D1$level.up == "yes"& D1$threshold.pred1 == "0", 1,0)
+
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- mean(ifelse(D1$threshold.pred1 == D1$level.up, 1,0))
 
-D1$precision.model1 <- 
+D1$precision.model1 <- sum(D1$truepos1)/(sum(D1$truepos1) + sum(D1$falsepos1))
 
-D1$recall.model1 <- 
+D1$recall.model1 <- sum(D1$truepos1)/(sum(D1$truepos1)+sum(D1$falseneg1))
 
 #Finally, calculate Kappa for your model according to:
 
@@ -73,8 +116,33 @@ matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
+#kappa for model 1 is 1.056
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+#threshold 2 = 0.7
+D1$threshold.pred2 <- ifelse(D1$pred2 >= 0.7, 1,0)
+D1$truepos2<- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "1",1,0)
+D1$falsepos2<- ifelse(D1$level.up =="no" & D1$threshold.pred1 =="1",1,0)
+D1$falseneg2<- ifelse(D1$level.up == "yes"& D1$threshold.pred1 == "0", 1,0)
+
+
+D1$accuracy.model2 <- mean(ifelse(D1$threshold.pred2 == D1$level.up, 1,0))
+
+D1$precision.model2 <- sum(D1$truepos2)/(sum(D1$truepos2) + sum(D1$falsepos2))
+
+D1$recall.model2 <- sum(D1$truepos2)/(sum(D1$truepos2)+sum(D1$falseneg2))
+
+table2 <- table(D1$level.up, D1$threshold.pred2)
+
+#Convert to matrix
+matrix2 <- as.matrix(table2)
+
+#Calculate kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#1.034
+
+#1.056>1.034, model 1 has slightly higher kappa. 
 
 ```
 
