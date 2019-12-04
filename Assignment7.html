@@ -437,8 +437,8 @@ printcp(ctree_1)</code></pre>
 ## 
 ##        CP nsplit rel error xerror     xstd
 ## 1 0.54250      0    1.0000 1.0000 0.038730
-## 2 0.01125      1    0.4575 0.4575 0.030569
-## 3 0.01000      3    0.4350 0.4750 0.031014</code></pre>
+## 2 0.01125      1    0.4575 0.4675 0.030825
+## 3 0.01000      3    0.4350 0.4725 0.030951</code></pre>
 <pre class="r"><code>#Generate a probability value that represents the probability that a student levels up based your classification tree 
 ctree_2&lt;- prune.rpart(ctree_1, cp = 0.01125)
 printcp(ctree_2)</code></pre>
@@ -456,7 +456,7 @@ printcp(ctree_2)</code></pre>
 ## 
 ##        CP nsplit rel error xerror     xstd
 ## 1 0.54250      0    1.0000 1.0000 0.038730
-## 2 0.01125      1    0.4575 0.4575 0.030569</code></pre>
+## 2 0.01125      1    0.4575 0.4675 0.030825</code></pre>
 <pre class="r"><code>online_data$pred &lt;- predict(ctree_1, type = &quot;prob&quot;)[,2]#Last class we used type = &quot;class&quot; which predicted the classification for us, this time we are using type = &quot;prob&quot; to see the probability that our classififcation is based on.</code></pre>
 </div>
 <div id="part-ii" class="section level2">
@@ -548,7 +548,7 @@ matrix1</code></pre>
 kappa(matrix1, exact = TRUE)/kappa(matrix1)</code></pre>
 <pre><code>## [1] 1.040758</code></pre>
 <pre class="r"><code>#Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-online_data$threshold.pred1 &lt;- ifelse(online_data$pred &gt;= 0.9, 1, 0)
+online_data$threshold.pred1 &lt;- ifelse(online_data$pred &gt; 0.5, 1, 0)
 #Now generate three diagnostics:
 online_data$accuracy.model1 &lt;-mean(ifelse(online_data$level.up == online_data$threshold.pred1, 1, 0))
 online_data$truepos.model1 &lt;- ifelse(online_data$level.up == &quot;1&quot; &amp; online_data$threshold.pred1 == &quot;1&quot;, 1, 0)
@@ -567,12 +567,12 @@ table2 &lt;- table(online_data$level.up, online_data$threshold.pred1)
 matrix2 &lt;- as.matrix(table2)
 matrix2</code></pre>
 <pre><code>##      
-##         0
-##   no  600
-##   yes 400</code></pre>
+##         0   1
+##   no  468 132
+##   yes  42 358</code></pre>
 <pre class="r"><code>#Calculate kappa
 kappa(matrix2, exact = TRUE)/kappa(matrix2)</code></pre>
-<pre><code>## [1] 1</code></pre>
+<pre><code>## [1] 0.9944954</code></pre>
 <div id="to-submit-your-assignment" class="section level3">
 <h3>To Submit Your Assignment</h3>
 <p>Please submit your assignment by first “knitting” your RMarkdown document into an html file and then commit, push and pull request both the RMarkdown file and the html file.</p>

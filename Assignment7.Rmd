@@ -110,7 +110,7 @@ matrix1
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-online_data$threshold.pred1 <- ifelse(online_data$pred >= 0.9, 1, 0)
+online_data$threshold.pred1 <- ifelse(online_data$pred > 0.5, 1, 0)
 #Now generate three diagnostics:
 online_data$accuracy.model1 <-mean(ifelse(online_data$level.up == online_data$threshold.pred1, 1, 0))
 online_data$truepos.model1 <- ifelse(online_data$level.up == "1" & online_data$threshold.pred1 == "1", 1, 0)
