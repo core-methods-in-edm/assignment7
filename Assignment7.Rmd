@@ -65,21 +65,7 @@ D1 %>% count(pred, level.up)
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
-D3 <- D2 
-%>%
-  # mutate(
-  #   pred = case_when(
-  #     pred == 0 ~ "no",
-  #     pred == 1 ~ "yes"
-  #   ) %>%
-  #     as.factor()
-  # ) %>%
-  mutate(
-    level.up = case_when(
-      level.up == "no" ~ 0,
-      level.up == "yes" ~ 1
-    )
-  )
+
 
 library(ROCR)
 
@@ -89,7 +75,7 @@ plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
@@ -98,11 +84,12 @@ unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC valu
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+threshold.pred1 <- ifelse(D1$pred >= 0.5, 1, 0)
+D1$threshold.pred1 <- threshold.pred1
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <-ifelse(D1$level.up == D1$threshold.pred1, 1, 0)
 
 D1$precision.model1 <- 
 
