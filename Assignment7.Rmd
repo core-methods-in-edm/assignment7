@@ -86,32 +86,46 @@ The first model is better.The first curve is closer to the upper left corner tha
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-perf <- performance(pred.detail, "tpr", "fpr")
-cutoffs <- data.frame(cut=perf@alpha.values[[1]], fpr=perf@x.values[[1]], tpr=perf@y.values[[1]])
-cutoffs <- cutoffs[order(cutoffs$tpr, decreasing=TRUE),]
-threshold.pred1 <- cutoffs$cut[1]
 
+threshold.pred1 <- ifelse(D1$pred >= 0.5,1,0)
+D1$threshold.pred1 <- threshold.pred1
  
 #Now generate three diagnostics:
  
-# D1$accuracy.model1 <-
-#  
-# D1$precision.model1 <- 
-#  
-# D1$recall.model1 <- 
+D1$accuracy.model1 <- ifelse(D1$level.up == D1$threshold.pred1, 1, 0)
+  
+#D1$precision.model1 <- 
+  
+#D1$recall.model1 <- 
  
 #Finally, calculate Kappa for your model according to:
  
 #First generate the table of comparisons
-# table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(D1$level.up, D1$threshold.pred1)
  
 #Convert to matrix
-# matrix1 <- as.matrix(table1)
+matrix1 <- as.matrix(table1)
  
 #Calculate kappa
-# kappa(matrix1, exact = TRUE)/kappa(matrix1)
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+threshold.pred1 <- ifelse(D1$pred >= 0.99,1,0)
+D1$threshold.pred1 <- threshold.pred1
+ 
+#Now generate three diagnostics:
+ 
+D1$accuracy.model1 <- ifelse(D1$level.up == D1$threshold.pred1, 1, 0)
+  
+
+table1 <- table(D1$level.up, D1$threshold.pred1)
+ 
+#Convert to matrix
+matrix1 <- as.matrix(table1)
+ 
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
 
 ```
 
