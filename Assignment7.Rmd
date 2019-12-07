@@ -33,16 +33,13 @@ pairs(A1)
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
-#Plot and generate a CP table for your tree 
-
-#Generate a probability value that represents the probability that a student levels up based your classification tree 
 library(rpart.plot)
 c.treea <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = A1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+#Plot and generate a CP table for your tree 
 printcp(c.treea)
-post(c.treea, file = "treea.ps", title = "level")
-rpart.plot(c.treea, type=3, box.palette = c("red", "green"), fallen.leaves = TRUE)
 
+plot(c.treea)
+#Generate a probability value that represents the probability that a student levels up based your classification tree 
 A1$pred <- predict(c.treea, A1, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
@@ -50,39 +47,78 @@ A1$pred <- predict(c.treea, A1, type = "prob")[,2]#Last class we used type = "cl
 ```{r}
 
 library(ROCR)
+
 #Plot the curve
-
+pred.detail <- prediction(A1$pred, A1$level.up) 
+plot(performance(pred.detail, "tpr", "fpr"))
+abline(0, 1, lty = 2)
 #Calculate the Area Under the Curve
+unlist(slot(performance(pred.detail,"auc"), "y.values"))
+#as this question, you need to run both plot and bline together
 
+#Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+c.tree2<-rpart(level.up~pre.test.score+post.test.score+forum.posts, method="class",data=A1)
+printcp(c.tree2)
+post(c.tree2, file = "dtree2.ps", title = "tree2")
+rpart.plot(c.tree2, type=3, box.palette = c("red", "green"), fallen.leaves = TRUE)
+A1$pred2 <- predict(c.tree2, A1, type="prob")[,2]
+pred.detail2 <- prediction(A1$pred2, A1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2, "auc"), "y.values"))
+# from the ROC curve, we think the first model is better because the auc value is higher.  
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+A1$threshold.pred1 <- ifelse(A1$pred >= 0.8, "yes", "no")
+A1$threshold.pred2 <- ifelse(A1$pred >= 0.95, "yes", "no")
+A1$threshold.pred3 <- ifelse(A1$pred >= 0.25, "yes", "no")
+
 
 #Now generate three diagnostics:
+accuracy.model1 <- mean(ifelse(A1$level.up == A1$threshold.pred1, 1, 0))
+A1$truepos.model1 <- ifelse(A1$level.up == "yes" & A1$threshold.pred1 == "yes", 1, 0)
+A1$falsepos.model1 <- ifelse(A1$level.up == "no" & A1$threshold.pred1 == "yes", 1,0)
+A1$falseneg.model1 <- ifelse(A1$level.up == "yes" & A1$threshold.pred1 == "no", 1,0)
+precision.model1 <- sum(A1$truepos.model1)/(sum(A1$truepos.model1) + sum(A1$falsepos.model1))
+recall.model1 <- sum(A1$truepos.model1)/(sum(A1$truepos.model1) + sum(A1$falseneg.model1))
 
-D1$accuracy.model1 <-
-
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(A1$level.up, A1$threshold.pred1)
+table1 
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
-
+#1.087797
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+accuracy.model3 <- mean(ifelse(A1$level.up == A1$threshold.pred3, 1, 0))
+A1$truepos.model3 <- ifelse(A1$level.up == "yes" & A1$threshold.pred3 == "yes", 1, 0)
+A1$falsepos.model3 <- ifelse(A1$level.up == "no" & A1$threshold.pred3 == "yes", 1,0)
+A1$falseneg.model3 <- ifelse(A1$level.up == "yes" & A1$threshold.pred3 == "no", 1,0)
+precision.model3 <- sum(A1$truepos.model3)/(sum(A1$truepos.model3) + sum(A1$falsepos.model3))
+recall.model3 <- sum(A1$truepos.model3)/(sum(A1$truepos.model3) + sum(A1$falseneg.model3))
+
+#First generate the table of comparisons
+table3 <- table(A1$level.up, A1$threshold.pred3)
+table3 
+
+#Convert to matrix
+matrix3 <- as.matrix(table3)
+
+#Calculate kappa
+kappa(matrix3, exact = TRUE)/kappa(matrix3)
+#1.030205
+#with higher threshold, the kappa value is higher and we can conclude that with higher threshold, our prediction is better 
 ```
 
 ### To Submit Your Assignment
