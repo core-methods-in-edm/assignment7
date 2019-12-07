@@ -5,71 +5,202 @@ date: "11/30/2016"
 output: html_document
 ---
 
-In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. The game involves a pre-test of geography knowledge (pre.test), a series of assignments for which you have the average score (av.assignment.score),  the number of messages sent by each student to other students about the assignments (messages), the number of forum posts students posted asking questions about the assignment (forum.posts), a post test at the end of the level (post.test) and whether or not the system allowed the students to go on to the next level (level.up).  
+In the following assignment you will be looking at data from an one level of an online geography tutoring system used by 5th grade students. 
+1.The game involves a pre-test of geography knowledge (pre.test)
+2.A series of assignments for which you have the average score (av.assignment.score)
+3.The number of messages sent by each student to other students about the assignments (messages)
+4.The number of forum posts students posted asking questions about the assignment (forum.posts)
+5.A post test at the end of the level (post.test) 
+6.Whether or not the system allowed the students to go on to the next level (level.up) 
 
 ## Part I
 
+#Get ready with the pacakages
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(rpart)
+library(corrplot)
+```
+
 #Upload data
 ```{r}
-
+df<-read.csv("online.data.csv",stringsAsFactors =FALSE, header = TRUE )
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
+df1<-gather(df,Vars,Value,-id,-level.up)
+
+#Distribution for all the continuous variable
+ggplot(df1,aes(x=Value))+
+  geom_histogram()+
+  facet_grid(.~Vars,scales = "free")
+
+
+#Plot for all the discreet variable
+df1$level_up<-"Level_up"
+ggplot(df1,aes(x=level_up,fill=factor(level.up)))+
+  geom_bar(position = "stack",width=0.2)+
+  scale_color_discrete("Level_up_option")
 
 #Then visualize the relationships between variables
+COR<-cor(df[,-c(1,7)])
 
-#Try to capture an intution about the data and the relationships
+corrplot(COR, order="AOE", method="circle", tl.pos="ld", type="lower",        
+tl.col="blue", tl.cex=0.8, tl.srt=20, 
+        addCoef.col="black", addCoefasPercent = TRUE,
+        sig.level=0.50, insig = "blank")
 
+#Try to capture an intuition about the data and the relationships
+#1. All the numeric variables are positively correlated
+#2. post.test.score and message(student sent to others to ask questions) are magnitudinally correlated with r scoring .94
+#3. post.test.score and average assignment score are moderately to highly correlated as well with r scoring .76
+#4. message(student sent to others to ask questions) and average assignment score are moderately to highly correlated with r scoring .71
+#5. Number of posts in forum shows weak correaltion with other variables
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
 
+#Try to use two model to see which one is more accurate
+
+#First one with these three variables:"post.test.score","messages","av.assignment.score" based on the correlation plot
+#Second one with these three variables: "pre.test.score","post.test.score","messages" based on common sense
+
+#pre_prune<-rpart.control(maxdepth = ,minsplit = )
+
+training_sample<-sample(nrow(df),nrow(df)*0.75)
+df_training<-df[training_sample,]
+df_testing<-df[-training_sample,]
+
+
+set.seed(726)
+c.tree1<-rpart(level.up~post.test.score+messages+av.assignment.score,data=df_training,method="class")
+c.tree2<-rpart(level.up~pre.test.score+post.test.score+messages,data=df_training,method="class")
+
 #Plot and generate a CP table for your tree 
+plotcp(c.tree1)
+plotcp(c.tree2)
 
+printcp(c.tree1)
+printcp(c.tree2)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
+df_testing$predicted1<-predict(c.tree1,df_testing,type="prob")[,2]
+df_testing$predicted2<-predict(c.tree2,df_testing,type="prob")[,2] # in order to do draw the ROC AND AUC
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
+
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
 library(ROCR)
+library(pROC)#(I am using a different package)
+#Plot the curve(ROCR)
+pred.detail1 <- prediction(df_testing$predicted1,df_testing$level.up) 
+plot(performance(pred.detail1, "tpr", "fpr"))+abline(0, 1, lty = 2)
 
-#Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
-plot(performance(pred.detail, "tpr", "fpr"))
-abline(0, 1, lty = 2)
+pred.detail2 <- prediction(df_testing$predicted2,df_testing$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))+abline(0, 1, lty = 2)
 
-#Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+#Plot the curve(pROC)
+ROC1<-roc(df_testing$level.up,df_testing$predicted1)
+ROC2<-roc(df_testing$level.up,df_testing$predicted2)
 
+plot(ROC1,col="red")
+plot(ROC2,col="blue")
+
+roc(df_testing$level.up,df_testing$predicted1,plot = TRUE,legacy.axes=TRUE,col="red",xlab="False Positive Percentage",ylab="True Positive Percentage",lwd=4)
+
+roc(df_testing$level.up,df_testing$predicted2,plot = TRUE,legacy.axes=TRUE,col="blue",xlab="False Positive Percentage",ylab="True Positive Percentage",lwd=4)
+
+#Here remember, if legacy.axes=TRUE wsa not specified, the x-axis would be specificty but not 1-specificty(False positive rate)
+
+#Calculate the Area Under the Curve (ROCR)
+unlist(slot(performance(pred.detail1,"auc"), "y.values")) #1
+unlist(slot(performance(pred.detail2,"auc"), "y.values")) #0.8276047
+#Unlist liberates the AUC value from the "performance" object created by ROCR
+
+#Calculate the Area Under the Curve (pROC)
+auc(ROC1) # 1
+auc(ROC2) # 0.8276
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
 ```
 ## Part III
 #Thresholds
 ```{r}
-#Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
+# Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+# Since tree1 is too perfect to predict,I decide to observe tree 2's ROC plot
+#Find the threshold
+roc.info1<-roc(df_testing$level.up,df_testing$predicted1,plot = TRUE,legacy.axes=TRUE)
+roc.info2<-roc(df_testing$level.up,df_testing$predicted2,plot = TRUE,legacy.axes=TRUE)
 
-#Now generate three diagnostics:
+roc.df1<-data.frame(tpp=roc.info1$sensitivities*100,
+                   fpp=(1-roc.info1$specificities)*100,
+                   thresholds=roc.info1$thresholds)
+head(roc.df1)
 
-D1$accuracy.model1 <-
+roc.df2<-data.frame(tpp=roc.info2$sensitivities*100,
+                   fpp=(1-roc.info2$specificities)*100,
+                   thresholds=roc.info2$thresholds)
+head(roc.df2) # find the optimal threshoulds:0.4078812
 
-D1$precision.model1 <- 
+# since we have already given up the first 
+```
 
-D1$recall.model1 <- 
+```{r}
+# using the new threshold to classify
+df_testing$threshold.pred2 <-ifelse(df_testing$predicted2>0.4078812,"yes","no")
+
+# Now generate three diagnostics:
+# Creating a confusion_matrix
+confusion_matrix<-as.matrix(table(df_testing$threshold.pred2,df_testing$level.up))
+
+
+#create a function to calculate Accuracy, Precision and Recall(for 2 by 2 matrix only)
+diagnositics_cal<-function(type="a",matrix){
+  TN<-matrix[1]
+  FN<-matrix[3]
+  FP<-matrix[2]
+  TP<-matrix[4]
+  if(type=="p"){
+    out<-TP/(TP+FN)
+  }else if(type=="r"){
+    out<-TP/(TP+FP)
+  }else if(type=="a"){
+    out<-(TP+TN)/(TP+TN+FP+FN)
+  }else{
+    print("you need to specify what type of calculation you are using")
+  }
+  out
+}
+
+
+df_testing$accuracy.model2<-diagnositics_cal("a",confusion_matrix)
+df_testing$precision.model2 <- diagnositics_cal("p",confusion_matrix)
+df_testing$recall.model2 <-diagnositics_cal("r",confusion_matrix)
+
+#model2 accuracy is 0.808, precision is 0.9183673, recall is 0.6923077
+
 
 #Finally, calculate Kappa for your model according to:
-
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
-
+table(df_testing$threshold.pred2,df_testing$level.up)
 #Convert to matrix
-matrix1 <- as.matrix(table1)
+matrix1 <- as.matrix(table(df_testing$threshold.pred2,df_testing$level.up))
+
+
+#Calculate kappa
+kappa(matrix1, exact = TRUE)/kappa(matrix1)
+
+# kappa is not possible >1 
+#install.packages("psych")
+library(psych) 
+cohen.kappa(matrix1)
 
 #Calculate kappa
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
