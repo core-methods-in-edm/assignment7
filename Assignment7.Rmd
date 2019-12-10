@@ -1,6 +1,6 @@
 ---
 title: "Assignment 7 - Answers"
-author: "Beibei"
+author: "Beibei Cao"
 date: "12/09/2019"
 output: html_document
 ---
