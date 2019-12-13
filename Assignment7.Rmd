@@ -11,62 +11,101 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+library(purrr)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+#install.packages("GGally")
+library(GGally)
+library(rpart)
+data1 <- read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+data1 %>%keep(is.numeric)%>% gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
 #Then visualize the relationships between variables
+ggpairs(select(data1, -id))
 
 #Try to capture an intution about the data and the relationships
+#strong correlation
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
+library(rpart)
+class <- rpart(level.up ~ pre.test.score + messages + forum.posts,
+                        data = data1)
+
 
 #Plot and generate a CP table for your tree 
-
+printcp(class)
+post(class,file = "class.ps",title = "level.up")
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
-D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
+class2 <- prune.rpart(class, cp = 0.01125)
+printcp(class2)
+data1$pred <- predict(class, type = "prob")[,2]
+
+#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
 ```
 ## Part II
 #Now you can generate the ROC curve for your model. You will need to install the package ROCR to do this.
 ```{r}
+#install.packages("ROCR")
 library(ROCR)
 
 #Plot the curve
-pred.detail <- prediction(D1$pred, D1$level.up) 
+pred.detail <- prediction(data1$pred, data1$level.up) 
 plot(performance(pred.detail, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 
 #Calculate the Area Under the Curve
-unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
+unlist(slot(performance(pred.detail,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+
+class3<-rpart((level.up)~post.test.score + av.assignment.score,method="class",data=data1)
+printcp(class3)
+
+data1$pred1 <- predict(class3, type = "prob")[,2] 
+pred.detail1<-prediction(data1$pred1, data1$level.up)
+plot(performance(pred.detail1, "tpr", "fpr"))+abline(0, 1, lty = 2,)
+unlist(slot(performance(pred.detail1,"auc"), "y.values"))
+
+#The first one i think was the better model, because the auc of first model is higher.
+
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+#I use 0.7 this time.
+data1$threshold.pred1 <- ifelse(data1$pred >= 0.7, 1, 0)
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+data1$accuracy.model1 <- mean(ifelse(data1$level.up == data1$threshold.pred1, 1, 0))
 
-D1$precision.model1 <- 
+#True positive,false positive, false negative
+data1$truepos<-ifelse(data1$level.up == 1 & data1$threshold.pred1 == 1,1,0)
+data1$falsepos<-ifelse(data1$level.up == 0 & data1$threshold.pred1 == 1,1,0)
+data1$falseneg<-ifelse(data1$level.up == 1 & data1$threshold.pred1 == 0,1,0)
 
-D1$recall.model1 <- 
+data1$precision.model1 <- sum(data1$truepos.model1)/(sum(data1$truepos.model1) + sum(data1$falsepos.model1))
+
+data1$recall.model1 <- sum(data1$truepos.model1)/(sum(data1$truepos.model1) + sum(data1$falseneg.model1))
 
 #Finally, calculate Kappa for your model according to:
 
 #First generate the table of comparisons
-table1 <- table(D1$level.up, D1$threshold.pred1)
+table1 <- table(data1$level.up, data1$threshold.pred1)
 
 #Convert to matrix
 matrix1 <- as.matrix(table1)
@@ -75,6 +114,24 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
+
+#I use 0.5 this time.
+data1$threshold.pred2 <- ifelse(data1$pred > 0.5, 1,0)
+data1$accuracy.model2 <- mean(ifelse(data1$level.up == data1$threshold.pred2, 1, 0))
+data1$truepos.model2 <- ifelse(data1$level.up == "1" & data1$threshold.pred2 == "1", 1, 0)
+data1$falsepos.model2 <- ifelse(data1$level.up == "0" & data1$threshold.pred2 == "1", 1,0)
+data1$falseneg.model2 <- ifelse(data1$level.up == "1" & data1$threshold.pred2 == "0", 1,0)
+data1$precision.model2 <- sum(data1$truepos.model2)/(sum(data1$truepos.model2) + sum(data1$falsepos.model2))
+data1$recall.model2 <-  sum(data1$truepos.model2)/(sum(data1$truepos.model2) + sum(data1$falseneg.model2))
+#Table
+table2 <- table(data1$level.up, data1$threshold.pred2)
+#Matrix
+matrix2 <- as.matrix(table2)
+#Kappa
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+matrix1
+matrix2
+##Model 1 kappa value is 1.04; Model 2 kappa value is 0.99. Theredore model 2 is better.
 
 ```
 
