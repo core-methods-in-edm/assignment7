@@ -11,24 +11,35 @@ In the following assignment you will be looking at data from an one level of an 
 
 #Upload data
 ```{r}
-
+D1<-read.csv("online.data.csv")
 ```
 
 #Visualization 
 ```{r}
 #Start by creating histograms of the distributions for all variables (#HINT: look up "facet" in the ggplot documentation)
-
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+D2 <- D1
+D2$level.up <- ifelse(D1$level.up =="yes",1,0)
+D3 <- gather(D2,"measure","score",2:7)
+p <- ggplot(D3,aes(score)) +
+  facet_wrap(~measure,scales = "free") +
+  geom_histogram(stat = "count")
 #Then visualize the relationships between variables
-
+pairs(D1)
 #Try to capture an intution about the data and the relationships
 
 ```
 #Classification tree
 ```{r}
 #Create a classification tree that predicts whether a student "levels up" in the online course using three variables of your choice (As we did last time, set all controls to their minimums)
-
+library(rpart)
+c.tree1 <- rpart(level.up ~ forum.posts + pre.test.score, method = "class", data = D1, control=rpart.control(minsplit=1, minbucket=1, cp=0.001))
+printcp(c.tree)
 #Plot and generate a CP table for your tree 
-
+plot(c.tree1)
+text(c.tree1)
 #Generate a probability value that represents the probability that a student levels up based your classification tree 
 
 D1$pred <- predict(rp, type = "prob")[,2]#Last class we used type = "class" which predicted the classification for us, this time we are using type = "prob" to see the probability that our classififcation is based on.
@@ -47,21 +58,27 @@ abline(0, 1, lty = 2)
 unlist(slot(performance(Pred2,"auc"), "y.values"))#Unlist liberates the AUC value from the "performance" object created by ROCR
 
 #Now repeat this process, but using the variables you did not use for the previous model and compare the plots & results of your two models. Which one do you think was the better model? Why?
+pred.detail2 <- prediction(D1$messages, D1$level.up) 
+plot(performance(pred.detail2, "tpr", "fpr"))
+abline(0, 1, lty = 2)
+unlist(slot(performance(pred.detail2,"auc"), "y.values"))
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
-
-threshold.pred1 <- 
+D1$threshold.pred1 <- ifelse(D1$pred >= 0.6,1,0)
+D1$truepos.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "yes", 1, 0)
+D1$falsepos.model1 <- ifelse(D1$level.up == "no" & D1$threshold.pred1 == "yes", 1,0)
+D1$falseneg.model1 <- ifelse(D1$level.up == "yes" & D1$threshold.pred1 == "no", 1,0)
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- mean(ifelse(D1$level.up==D1$threshold.pred1,1,0))
+D1$precision.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) 
+                                                 + sum(D1$falsepos.model1))
+D1$recall.model1 <- sum(D1$truepos.model1)/(sum(D1$truepos.model1) + sum(D1$falseneg.model1))
 
-D1$precision.model1 <- 
-
-D1$recall.model1 <- 
 
 #Finally, calculate Kappa for your model according to:
 
@@ -75,7 +92,17 @@ matrix1 <- as.matrix(table1)
 kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
-
+D1$threshold.pred2 <- ifelse(D1$pred >= 0.9,1,0)
+D1$truepos.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "yes", 1, 0)
+D1$falsepos.model2 <- ifelse(D1$level.up == "no" & D1$threshold.pred2 == "yes", 1,0)
+D1$falseneg.model2 <- ifelse(D1$level.up == "yes" & D1$threshold.pred2 == "no", 1,0)
+D1$accuracy.model2 <- mean(ifelse(D1$level.up==D1$threshold.pred2,1,0))
+D1$precision.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) 
+                                                 + sum(D1$falsepos.model2))
+D1$recall.model2 <- sum(D1$truepos.model2)/(sum(D1$truepos.model2) + sum(D1$falseneg.model2))
+table2 <- table(D1$level.up, D1$threshold.pred2)
+matrix2 <- as.matrix(table2)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
 ```
 
 ### To Submit Your Assignment
