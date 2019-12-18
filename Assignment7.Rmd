@@ -79,22 +79,27 @@ pred.detail2 <- prediction(D1$pred2, D1$level.up)
 plot(performance(pred.detail2, "tpr", "fpr"))
 abline(0, 1, lty = 2)
 unlist(slot(performance(pred.detail2,"auc"), "y.values"))
-#0.9744167
+
+#0.9744167, which is lower than the first one. so the second one is better.
 ```
 ## Part III
 #Thresholds
 ```{r}
 #Look at the ROC plot for your first model. Based on this plot choose a probability threshold that balances capturing the most correct predictions against false positives. Then generate a new variable in your data set that classifies each student according to your chosen threshold.
 
-threshold.pred1 <- 
+D1$threshold.pred1 <- ifelse(D1$pred>=0.57,1,0)
 
 #Now generate three diagnostics:
 
-D1$accuracy.model1 <-
+D1$accuracy.model1 <- ifelse(D1$level.up==D1$threshold.pred1,1,0)
 
-D1$precision.model1 <- 
+D1$tp.model1 <- ifelse(D1$level.up=="1" & D1$threshold.pred1=="1",1,0)
+D1$fp.model1 <- ifelse(D1$level.up=="0" & D1$threshold.pred1=="1",1,0)
+D1$fp.model1 <- ifelse(D1$level.up=="1" & D1$threshold.pred1=="0",1,0)
 
-D1$recall.model1 <- 
+D1$precision.model1 <- sum(D1$tp.model1)/(sum(D1$tp.model1)+sum(D1$fp.model1))
+
+D1$recall.model1 <- sum(D1$tp.model1)/(sum(D1$tp.model1)+sum(D1$fp.model1))
 
 #Finally, calculate Kappa for your model according to:
 
@@ -109,6 +114,17 @@ kappa(matrix1, exact = TRUE)/kappa(matrix1)
 
 #Now choose a different threshold value and repeat these diagnostics. What conclusions can you draw about your two thresholds?
 
+D1$threshold.pred2 <- ifelse(D1$pred2>=0.9,1,0)
+D1$accuracy.model2 <- ifelse(D1$level.up==D1$threshold.pred2,1,0)
+D1$tp.model2 <- ifelse(D1$level.up=="1" & D1$threshold.pred2=="1",1,0)
+D1$fp.model2 <- ifelse(D1$level.up=="0" & D1$threshold.pred2=="1",1,0)
+D1$fp.model2 <- ifelse(D1$level.up=="1" & D1$threshold.pred2=="0",1,0)
+D1$precision.model2 <- sum(D1$tp.model2)/(sum(D1$tp.model2)+sum(D1$fp.model2))
+D1$recall.model2 <- sum(D1$tp.model2)/(sum(D1$tp.model2)+sum(D1$fp.model2))
+table2 <- table(D1$level.up, D1$threshold.pred2)
+matrix2 <- as.matrix(table2)
+kappa(matrix2, exact = TRUE)/kappa(matrix2)
+#1.089086
 ```
 
 ### To Submit Your Assignment
