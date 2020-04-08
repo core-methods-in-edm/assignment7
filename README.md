@@ -1,4 +1,4 @@
-# Binary classification evaluation metrics
+# Binary Classification Evaluation Metrics
 
 This repo contains files for an assignment (assignment 7) for HUDK 4050: Core Methods in Educational Data Mining. The assignment involves model comparison based on common binary classification evaluation metrics:
 * Accuracy
